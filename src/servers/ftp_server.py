@@ -2,6 +2,10 @@ import os
 import random
 import socket
 import threading
+import sys
+
+# Add common directory to path for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
 import rudp_lib  # Import our helper library
 

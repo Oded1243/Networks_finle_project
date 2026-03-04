@@ -4,6 +4,10 @@ import random
 import socket
 import struct
 import time
+import sys
+
+# Add common directory to path for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
 from dnslib import DNSRecord
 
