@@ -1,44 +1,44 @@
 import struct
 
-# --- קבועים למניעת "מספרי קסם" (Magic Numbers) --- (קוד זה נוצר בעזרת AI)
-# דגלים (Flags) - נשתמש בביטים (Bitwise) כדי שנוכל לשלב דגלים (למשל ACK + FIN)
+# --- Constants to avoid "magic numbers" (Magic Numbers) --- (This code was created with AI)
+# Flags - We use bits (Bitwise) so we can combine flags (for example ACK + FIN)
 FLAG_NONE = 0b00000000
-FLAG_SYN = 0b00000001  # בקשת התחברות
-FLAG_ACK = 0b00000010  # אישור קבלה
-FLAG_FIN = 0b00000100  # סיום התקשרות
-FLAG_DATA = 0b00001000  # חבילת נתונים
+FLAG_SYN = 0b00000001  # Connection request
+FLAG_ACK = 0b00000010  # Receipt confirmation
+FLAG_FIN = 0b00000100  # End of connection
+FLAG_DATA = 0b00001000  # Data packet
 
-# הגדרות גדלים
-# UDP מוגבל ל-65535 בתים. ניקח שוליים ביטחון ונגדיר גודל מידע מקסימלי ל-60,000.
+# Size definitions
+# UDP is limited to 65535 bytes. We'll take a safety margin and set max data size to 60,000.
 MAX_PAYLOAD_SIZE = 60000
 HEADER_FORMAT = "!IIB"  # I = 4 bytes (unsigned int), B = 1 byte (unsigned char)
-HEADER_SIZE = struct.calcsize(HEADER_FORMAT)  # גודל הכותרת שלנו (9 בתים)
+HEADER_SIZE = struct.calcsize(HEADER_FORMAT)  # Size of our header (9 bytes)
 
 
 def create_packet(seq_num, ack_num, flags, data=b""):
     """
-    אורז את הנתונים והכותרת לחבילת RUDP אחת מוכנה לשליחה.
-    (פונקציה זו נוצרה בעזרת AI)
+    Packs the data and header into one RUDP packet ready for transmission.
+    (This function was created with AI)
     """
-    # יצירת הכותרת לפי הפורמט: Sequence, ACK, Flags
+    # Creating the header according to the format: Sequence, ACK, Flags
     header = struct.pack(HEADER_FORMAT, seq_num, ack_num, flags)
     return header + data
 
 
 def parse_packet(packet_bytes):
     """
-    מפרק חבילת RUDP שהתקבלה לכותרת ולנתונים.
-    מחזיר: (seq_num, ack_num, flags, data)
-    (פונקציה זו נוצרה בעזרת AI)
+    Unpacks a received RUDP packet into header and data.
+    Returns: (seq_num, ack_num, flags, data)
+    (This function was created with AI)
     """
     if len(packet_bytes) < HEADER_SIZE:
         raise ValueError("Packet is too small to contain a valid RUDP header.")
 
-    # חיתוך הכותרת מתוך החבילה
+    # Extract the header from the packet
     header = packet_bytes[:HEADER_SIZE]
     data = packet_bytes[HEADER_SIZE:]
 
-    # פירוק הכותרת למשתנים
+    # Unpack the header into variables
     seq_num, ack_num, flags = struct.unpack(HEADER_FORMAT, header)
 
     return seq_num, ack_num, flags, data

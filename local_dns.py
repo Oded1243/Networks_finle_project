@@ -1,10 +1,10 @@
 from dnslib import QTYPE, RR, A
 from dnslib.server import BaseResolver, DNSLogger, DNSServer
 
-# --- קבועים למניעת "מספרי קסם" --- (נוצר/שופר בעזרת AI)
-DNS_PORT = 5053  # פורט DNS תקני
-DNS_HOST = "127.0.0.1"  # כתובת מקומית לבדיקה
-DEFAULT_TTL = 60  # זמן חיים ברירת מחדל לרשומה
+# --- Constants to avoid "magic numbers" --- (Created/improved with AI)
+DNS_PORT = 5053  # Standard DNS port
+DNS_HOST = "127.0.0.1"  # Local address for testing
+DEFAULT_TTL = 60  # Default TTL for record
 
 
 class LocalResolver(BaseResolver):
@@ -21,7 +21,7 @@ class LocalResolver(BaseResolver):
 
         if clean_qname in self.records:
             ip_address = self.records[clean_qname]
-            # שימוש בקבוע DEFAULT_TTL במקום מספר קסם (שורת קוד זו שונתה בעזרת AI)
+            # Use DEFAULT_TTL constant instead of magic number (this line was modified with AI)
             reply.add_answer(RR(qname, QTYPE.A, rdata=A(ip_address), ttl=DEFAULT_TTL))
             print(f"[+] Resolved {clean_qname} to {ip_address}")
         else:
@@ -31,7 +31,7 @@ class LocalResolver(BaseResolver):
 
 
 if __name__ == "__main__":
-    # התאמת הדומיין לשרת ה-FTP של הפרויקט (נוצר/שופר בעזרת AI)
+    # Mapping the domain to the project's FTP server (created/modified with AI)
     LOCAL_RECORDS = {
         "ftp.local": "127.0.0.1",
         "database.local": "127.0.0.1",
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     resolver = LocalResolver(LOCAL_RECORDS)
     logger = DNSLogger(log="request,reply,truncated,error")  # Logs DNS traffic
 
-    # שימוש במשתנים הקבועים שהגדרנו למעלה (שורת קוד זו שונתה בעזרת AI)
+    # Use the constants we defined above (this line was modified with AI)
     server = DNSServer(resolver, port=DNS_PORT, address=DNS_HOST, logger=logger)
 
     print(f"Starting Local DNS server on {DNS_HOST}:{DNS_PORT}...")

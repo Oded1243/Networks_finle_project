@@ -2,41 +2,41 @@ import binascii
 import socket
 import struct
 
-# --- קבועים למניעת "מספרי קסם" (Magic Numbers) ---
-# פורטים
+# --- Constants to avoid "magic numbers" (Magic Numbers) ---
+# Ports
 DHCP_SERVER_PORT = 67
 DHCP_CLIENT_PORT = 68
 
-# סוגי פעולות (OP Codes)
-OP_BOOTREQUEST = 1  # בקשה מהלקוח
-OP_BOOTREPLY = 2  # תשובה מהשרת
+# Types of operations (OP Codes)
+OP_BOOTREQUEST = 1  # Request from client
+OP_BOOTREPLY = 2  # Response from server
 
-# סוגי חומרה
+# Hardware types
 HTYPE_ETHERNET = 1
 HLEN_MAC = 6
 
-# סוגי הודעות DHCP (Option 53)
+# DHCP message types (Option 53)
 DHCP_DISCOVER = 1
 DHCP_OFFER = 2
 DHCP_REQUEST = 3
 DHCP_ACK = 5
 
-# מספרי אפשרויות (DHCP Options)
+# Option numbers (DHCP Options)
 OPT_LEASE_TIME = 51
 OPT_MESSAGE_TYPE = 53
 OPT_SERVER_ID = 54
 OPT_END = 255
 
-# הגדרות רשת
+# Network settings
 SERVER_IP = "192.168.1.100"
 OFFERED_IP = "192.168.1.150"
 BROADCAST_IP = "255.255.255.255"
-LEASE_TIME_SEC = 3600  # שעה אחת
+LEASE_TIME_SEC = 3600  # One hour
 
 
 def get_dhcp_message_type(options_bytes):
     """
-    מחלץ את סוג הודעת ה-DHCP מתוך אזור האפשרויות.
+    Extracts DHCP message type from the options area.
     """
     i = 0
     while i < len(options_bytes):
@@ -57,7 +57,7 @@ def get_dhcp_message_type(options_bytes):
 
 def create_dhcp_response(xid, client_mac_bytes, message_type):
     """
-    בונה חבילת תשובה (Offer או ACK).
+    Builds a response packet (Offer or ACK).
     """
     server_ip_packed = socket.inet_aton(SERVER_IP)
     offered_ip_packed = socket.inet_aton(OFFERED_IP)
