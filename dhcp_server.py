@@ -1,6 +1,6 @@
+import binascii
 import socket
 import struct
-import binascii
 
 # --- קבועים למניעת "מספרי קסם" (Magic Numbers) ---
 # פורטים
@@ -30,7 +30,7 @@ OPT_END = 255
 # הגדרות רשת
 SERVER_IP = "192.168.1.100"
 OFFERED_IP = "192.168.1.150"
-BROADCAST_IP = '255.255.255.255'
+BROADCAST_IP = "255.255.255.255"
 LEASE_TIME_SEC = 3600  # שעה אחת
 
 
@@ -64,19 +64,21 @@ def create_dhcp_response(xid, client_mac_bytes, message_type):
     zero_ip_packed = socket.inet_aton("0.0.0.0")
 
     # Header: OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, Hops(0)
-    header = struct.pack('!BBBB', OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, 0)
-    xid_secs_flags = struct.pack('!IHH', xid, 0, 0x8000)  # Broadcast flag
+    header = struct.pack("!BBBB", OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, 0)
+    xid_secs_flags = struct.pack("!IHH", xid, 0, 0x8000)  # Broadcast flag
 
-    ips = struct.pack('!4s4s4s4s', zero_ip_packed, offered_ip_packed, server_ip_packed, zero_ip_packed)
+    ips = struct.pack(
+        "!4s4s4s4s", zero_ip_packed, offered_ip_packed, server_ip_packed, zero_ip_packed
+    )
 
-    chaddr = client_mac_bytes + b'\x00' * 10
-    sname_file_cookie = b'\x00' * 192 + struct.pack('!I', 0x63825363)  # Magic Cookie
+    chaddr = client_mac_bytes + b"\x00" * 10
+    sname_file_cookie = b"\x00" * 192 + struct.pack("!I", 0x63825363)  # Magic Cookie
 
     # Options
-    options = struct.pack('!BBB', OPT_MESSAGE_TYPE, 1, message_type)
-    options += struct.pack('!BB', OPT_SERVER_ID, 4) + server_ip_packed
-    options += struct.pack('!BB', OPT_LEASE_TIME, 4) + struct.pack('!I', LEASE_TIME_SEC)
-    options += struct.pack('!B', OPT_END)
+    options = struct.pack("!BBB", OPT_MESSAGE_TYPE, 1, message_type)
+    options += struct.pack("!BB", OPT_SERVER_ID, 4) + server_ip_packed
+    options += struct.pack("!BB", OPT_LEASE_TIME, 4) + struct.pack("!I", LEASE_TIME_SEC)
+    options += struct.pack("!B", OPT_END)
 
     return header + xid_secs_flags + ips + chaddr + sname_file_cookie + options
 
@@ -86,7 +88,7 @@ def start_dhcp_server():
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    server_socket.bind(('0.0.0.0', DHCP_SERVER_PORT))
+    server_socket.bind(("0.0.0.0", DHCP_SERVER_PORT))
     print(f"[*] DHCP Server listening on port {DHCP_SERVER_PORT}...")
 
     try:
@@ -97,9 +99,9 @@ def start_dhcp_server():
 
             op = packet_data[0]
             if op == OP_BOOTREQUEST:
-                xid = struct.unpack('!I', packet_data[4:8])[0]
+                xid = struct.unpack("!I", packet_data[4:8])[0]
                 client_mac_bytes = packet_data[28:34]
-                mac_str = binascii.hexlify(client_mac_bytes).decode('utf-8')
+                mac_str = binascii.hexlify(client_mac_bytes).decode("utf-8")
 
                 options_bytes = packet_data[240:]
                 msg_type = get_dhcp_message_type(options_bytes)

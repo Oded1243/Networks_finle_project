@@ -1,10 +1,11 @@
-from dnslib import RR, QTYPE, A
-from dnslib.server import DNSServer, BaseResolver, DNSLogger
+from dnslib import QTYPE, RR, A
+from dnslib.server import BaseResolver, DNSLogger, DNSServer
 
 # --- קבועים למניעת "מספרי קסם" --- (נוצר/שופר בעזרת AI)
-DNS_PORT = 5053        # פורט DNS תקני
-DNS_HOST = "127.0.0.1" # כתובת מקומית לבדיקה
-DEFAULT_TTL = 60     # זמן חיים ברירת מחדל לרשומה
+DNS_PORT = 5053  # פורט DNS תקני
+DNS_HOST = "127.0.0.1"  # כתובת מקומית לבדיקה
+DEFAULT_TTL = 60  # זמן חיים ברירת מחדל לרשומה
+
 
 class LocalResolver(BaseResolver):
     def __init__(self, records):
@@ -16,7 +17,7 @@ class LocalResolver(BaseResolver):
     def resolve(self, request, handler):
         reply = request.reply()
         qname = str(request.q.qname)
-        clean_qname = qname.rstrip('.')
+        clean_qname = qname.rstrip(".")
 
         if clean_qname in self.records:
             ip_address = self.records[clean_qname]
@@ -28,12 +29,13 @@ class LocalResolver(BaseResolver):
 
         return reply
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # התאמת הדומיין לשרת ה-FTP של הפרויקט (נוצר/שופר בעזרת AI)
     LOCAL_RECORDS = {
         "ftp.local": "127.0.0.1",
         "database.local": "127.0.0.1",
-        "router.local": "127.0.0.1"
+        "router.local": "127.0.0.1",
     }
 
     resolver = LocalResolver(LOCAL_RECORDS)

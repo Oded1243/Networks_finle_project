@@ -11,11 +11,11 @@ FLAG_DATA = 0b00001000  # חבילת נתונים
 # הגדרות גדלים
 # UDP מוגבל ל-65535 בתים. ניקח שוליים ביטחון ונגדיר גודל מידע מקסימלי ל-60,000.
 MAX_PAYLOAD_SIZE = 60000
-HEADER_FORMAT = '!IIB'  # I = 4 bytes (unsigned int), B = 1 byte (unsigned char)
+HEADER_FORMAT = "!IIB"  # I = 4 bytes (unsigned int), B = 1 byte (unsigned char)
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)  # גודל הכותרת שלנו (9 בתים)
 
 
-def create_packet(seq_num, ack_num, flags, data=b''):
+def create_packet(seq_num, ack_num, flags, data=b""):
     """
     אורז את הנתונים והכותרת לחבילת RUDP אחת מוכנה לשליחה.
     (פונקציה זו נוצרה בעזרת AI)

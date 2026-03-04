@@ -1,11 +1,13 @@
+import binascii
+import os
+import random
 import socket
 import struct
-import binascii
-import random
 import time
-import os
-import rudp_lib
+
 from dnslib import DNSRecord
+
+import rudp_lib
 
 # --- קבועים למניעת "מספרי קסם" --- (קוד זה נוצר/שופר בעזרת AI)
 # פורטים
@@ -16,7 +18,7 @@ FTP_TCP_PORT = 2121
 
 # הגדרות רשת וקבצים
 LOCAL_HOST = "127.0.0.1"
-BROADCAST_IP = '255.255.255.255'
+BROADCAST_IP = "255.255.255.255"
 CLIENT_DIR = "client_downloads"  # נתיב יחסי כדי שיעבוד על כל מחשב
 BUFFER_SIZE = 4096
 
@@ -39,22 +41,22 @@ def create_dhcp_request(xid, mac_bytes, message_type):
     (פונקציה זו נוצרה בעזרת AI)
     """
     # Header
-    header = struct.pack('!BBBB', OP_BOOTREQUEST, HTYPE_ETHERNET, HLEN_MAC, 0)
-    xid_secs_flags = struct.pack('!IHH', xid, 0, 0x8000)  # Broadcast flag
+    header = struct.pack("!BBBB", OP_BOOTREQUEST, HTYPE_ETHERNET, HLEN_MAC, 0)
+    xid_secs_flags = struct.pack("!IHH", xid, 0, 0x8000)  # Broadcast flag
 
     # Client IP, Your IP, Server IP, Gateway IP (הכל אפסים כי עוד אין לנו IP)
     zero_ip = socket.inet_aton("0.0.0.0")
-    ips = struct.pack('!4s4s4s4s', zero_ip, zero_ip, zero_ip, zero_ip)
+    ips = struct.pack("!4s4s4s4s", zero_ip, zero_ip, zero_ip, zero_ip)
 
     # MAC Address + Padding (16 bytes total)
-    chaddr = mac_bytes + b'\x00' * 10
+    chaddr = mac_bytes + b"\x00" * 10
 
     # Magic Cookie
-    sname_file_cookie = b'\x00' * 192 + struct.pack('!I', 0x63825363)
+    sname_file_cookie = b"\x00" * 192 + struct.pack("!I", 0x63825363)
 
     # Options
-    options = struct.pack('!BBB', OPT_MESSAGE_TYPE, 1, message_type)
-    options += struct.pack('!B', OPT_END)
+    options = struct.pack("!BBB", OPT_MESSAGE_TYPE, 1, message_type)
+    options += struct.pack("!B", OPT_END)
 
     return header + xid_secs_flags + ips + chaddr + sname_file_cookie + options
 
@@ -69,11 +71,11 @@ def perform_dhcp_handshake():
     client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    client_socket.bind(('0.0.0.0', DHCP_CLIENT_PORT))
+    client_socket.bind(("0.0.0.0", DHCP_CLIENT_PORT))
     client_socket.settimeout(3.0)
 
     xid = random.randint(1, 0xFFFFFFFF)
-    mac_bytes = b'\xaa\xbb\xcc\xdd\xee\xff'
+    mac_bytes = b"\xaa\xbb\xcc\xdd\xee\xff"
 
     try:
         # 1. DISCOVER
@@ -146,24 +148,24 @@ def tcp_ftp_client(server_ip):
 
         # 1. LIST command
         print("[*] Sending LIST command...")
-        client_socket.send("LIST".encode('utf-8'))
-        file_list = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+        client_socket.send("LIST".encode("utf-8"))
+        file_list = client_socket.recv(BUFFER_SIZE).decode("utf-8")
         print(f"--- Files on Server ---\n{file_list}\n-----------------------")
 
         # 2. RETR command (מוריד את הקובץ הראשון ברשימה)
-        files = file_list.split('\n')
+        files = file_list.split("\n")
         if files and files[0] != "Empty directory":
             target_file = files[0]
             print(f"\n[*] Sending RETR command for '{target_file}'...")
-            client_socket.send(f"RETR {target_file}".encode('utf-8'))
+            client_socket.send(f"RETR {target_file}".encode("utf-8"))
 
-            response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+            response = client_socket.recv(BUFFER_SIZE).decode("utf-8")
             if response.startswith("OK"):
                 filesize = int(response.split(" ")[1])
                 print(f"[+] Server ready to send. File size: {filesize} bytes")
 
                 # שליחת אישור מוכנות לשרת
-                client_socket.send("READY".encode('utf-8'))
+                client_socket.send("READY".encode("utf-8"))
 
                 filepath = os.path.join(CLIENT_DIR, target_file)
                 with open(filepath, "wb") as f:
@@ -175,12 +177,14 @@ def tcp_ftp_client(server_ip):
                         f.write(chunk)
                         bytes_received += len(chunk)
 
-                print(f"[V] File '{target_file}' downloaded successfully to '{CLIENT_DIR}' folder!")
+                print(
+                    f"[V] File '{target_file}' downloaded successfully to '{CLIENT_DIR}' folder!"
+                )
             else:
                 print(f"[-] Server refused RETR: {response}")
 
         # 3. QUIT command
-        client_socket.send("QUIT".encode('utf-8'))
+        client_socket.send("QUIT".encode("utf-8"))
         print("[*] Disconnected from FTP Server.")
 
     except Exception as e:
@@ -204,7 +208,7 @@ def rudp_ftp_client(server_ip, filename):
 
     # 1. שליחת בקשת התחברות והורדה (SYN + RETR)
     print(f"[*] Sending RUDP SYN request for '{filename}'...")
-    req_data = f"RETR {filename}".encode('utf-8')
+    req_data = f"RETR {filename}".encode("utf-8")
     # יצירת חבילה בעזרת הספרייה שלנו: seq=0, ack=0, flag=SYN
     syn_packet = rudp_lib.create_packet(0, 0, rudp_lib.FLAG_SYN, req_data)
     client_socket.sendto(syn_packet, server_addr)
@@ -216,7 +220,7 @@ def rudp_ftp_client(server_ip, filename):
 
     print(f"[*] Waiting for RUDP data packets...")
 
-    with open(filepath, 'wb') as f:
+    with open(filepath, "wb") as f:
         while True:
             try:
                 # קבלת חבילה מהרשת (עד 65535 בתים)
@@ -225,18 +229,24 @@ def rudp_ftp_client(server_ip, filename):
                 # פירוק החבילה לחלקים לפי ה-Header שלנו
                 seq_num, ack_num, flags, data = rudp_lib.parse_packet(packet_bytes)
 
-                with open(filepath, 'wb') as f:
+                with open(filepath, "wb") as f:
                     while True:
                         try:
                             # קבלת חבילה מהרשת
                             packet_bytes, _ = client_socket.recvfrom(65535)
-                            seq_num, ack_num, flags, data = rudp_lib.parse_packet(packet_bytes)
+                            seq_num, ack_num, flags, data = rudp_lib.parse_packet(
+                                packet_bytes
+                            )
 
                             # 2. האם השרת סיים לשלוח? (FIN) - השורה הזו חסרה לך!
                             if flags & rudp_lib.FLAG_FIN:
-                                print("\n[*] Received FIN flag. File transfer complete.")
+                                print(
+                                    "\n[*] Received FIN flag. File transfer complete."
+                                )
                                 print("[*] Sending final ACK...")
-                                ack_packet = rudp_lib.create_packet(0, seq_num, rudp_lib.FLAG_ACK)
+                                ack_packet = rudp_lib.create_packet(
+                                    0, seq_num, rudp_lib.FLAG_ACK
+                                )
                                 client_socket.sendto(ack_packet, server_addr)
                                 break
 
@@ -246,23 +256,35 @@ def rudp_ftp_client(server_ip, filename):
                                 if seq_num == expected_seq:
                                     # החבילה הגיעה בסדר הנכון! נשמור אותה
                                     f.write(data)
-                                    print(f"  [+] Received packet {seq_num} (Valid). Sending ACK.")
+                                    print(
+                                        f"  [+] Received packet {seq_num} (Valid). Sending ACK."
+                                    )
 
-                                    expected_seq += 1  # מקדמים את המונה *לפני* שליחת האישור
+                                    expected_seq += (
+                                        1  # מקדמים את המונה *לפני* שליחת האישור
+                                    )
 
                                     # נשלח ACK עם המספר הבא שאנחנו מצפים לו (expected_seq החדש)
-                                    ack_packet = rudp_lib.create_packet(0, expected_seq, rudp_lib.FLAG_ACK)
+                                    ack_packet = rudp_lib.create_packet(
+                                        0, expected_seq, rudp_lib.FLAG_ACK
+                                    )
                                     client_socket.sendto(ack_packet, server_addr)
 
                                 else:
                                     # חבילה מחוץ לסדר!
-                                    print(f"  [-] Out of order! Expected {expected_seq}, got {seq_num}. Dropping.")
+                                    print(
+                                        f"  [-] Out of order! Expected {expected_seq}, got {seq_num}. Dropping."
+                                    )
                                     # נשלח שוב ACK שמודיע לשרת לאיזו חבילה אנחנו עדיין מחכים
-                                    ack_packet = rudp_lib.create_packet(0, expected_seq, rudp_lib.FLAG_ACK)
+                                    ack_packet = rudp_lib.create_packet(
+                                        0, expected_seq, rudp_lib.FLAG_ACK
+                                    )
                                     client_socket.sendto(ack_packet, server_addr)
 
                         except socket.timeout:
-                            print("\n[-] RUDP Timeout: No packets received from server.")
+                            print(
+                                "\n[-] RUDP Timeout: No packets received from server."
+                            )
                             break
                         except Exception as e:
                             print(f"\n[-] RUDP Client error: {e}")
@@ -276,6 +298,7 @@ def rudp_ftp_client(server_ip, filename):
                 break
 
     print(f"[V] RUDP Download finished. Saved to '{filepath}'.")
+
 
 if __name__ == "__main__":
     print("=== Starting Client App ===\n")
