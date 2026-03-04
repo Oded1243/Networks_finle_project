@@ -39,17 +39,17 @@ def main():
 
     try:
         print("[*] Starting DHCP Server...")
-        dhcp = run_process("dhcp_server.py")
+        dhcp = run_process("src/dhcp_server.py")
         processes.append(dhcp)
         time.sleep(1)
 
         print("[*] Starting Local DNS Server...")
-        dns = run_process("local_dns.py")
+        dns = run_process("src/local_dns.py")
         processes.append(dns)
         time.sleep(1)
 
         print("[*] Starting FTP/RUDP Server...")
-        ftp = run_process("ftp_server.py")
+        ftp = run_process("src/ftp_server.py")
         processes.append(ftp)
         time.sleep(2)
 
@@ -57,7 +57,7 @@ def main():
         # Client we want to see the output of in THIS window potentially,
         # but the other servers log to their own windows.
         # Let's run client in this window to see the "flow".
-        subprocess.call([sys.executable, "client.py"])
+        subprocess.call([sys.executable, "src/client.py"])
 
     except KeyboardInterrupt:
         print("\n[-] Stopping test...")
