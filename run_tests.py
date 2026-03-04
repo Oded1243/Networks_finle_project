@@ -48,8 +48,8 @@ def main():
         processes.append(dns)
         time.sleep(1)
 
-        print("[*] Starting FTP/RUDP Server...")
-        ftp = run_process("src/servers/ftp_server.py")
+        print("[*] Starting Object Storage Server...")
+        ftp = run_process("src/servers/object_storage_server.py")
         processes.append(ftp)
         time.sleep(2)
 
@@ -67,7 +67,9 @@ def main():
         print("\n[*] Cleaning up...")
         # Since we used 'start' shell=True on Windows, we can't easily kill the spawned windows from here
         # without more complex logic, but we can tell the user to close them.
-        print("[!] Please manually close the opened server windows (DHCP, DNS, FTP).")
+        print(
+            "[!] Please manually close the opened server windows (DHCP, DNS, Object Storage)."
+        )
 
 
 if __name__ == "__main__":

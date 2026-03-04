@@ -138,3 +138,7 @@ client_downloads/
 server_files/
 
 .idea/
+
+client_objects/
+object_storage/
+*.db

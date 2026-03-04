@@ -34,6 +34,7 @@ if __name__ == "__main__":
     # Mapping the domain to the project's FTP server (created/modified with AI)
     LOCAL_RECORDS = {
         "ftp.local": "127.0.0.1",
+        "object.store": "127.0.0.1",
         "database.local": "127.0.0.1",
         "router.local": "127.0.0.1",
     }
