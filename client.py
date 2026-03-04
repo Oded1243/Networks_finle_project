@@ -229,64 +229,42 @@ def rudp_ftp_client(server_ip, filename):
                 # Parsing the packet into parts according to our header
                 seq_num, ack_num, flags, data = rudp_lib.parse_packet(packet_bytes)
 
-                with open(filepath, "wb") as f:
-                    while True:
-                        try:
-                            # Receiving a packet from the network
-                            packet_bytes, _ = client_socket.recvfrom(65535)
-                            seq_num, ack_num, flags, data = rudp_lib.parse_packet(
-                                packet_bytes
-                            )
+                # 2. Did the server finish sending? (FIN)
+                if flags & rudp_lib.FLAG_FIN:
+                    print("\n[*] Received FIN flag. File transfer complete.")
+                    print("[*] Sending final ACK...")
+                    ack_packet = rudp_lib.create_packet(0, seq_num, rudp_lib.FLAG_ACK)
+                    client_socket.sendto(ack_packet, server_addr)
+                    break
 
-                            # 2. Did the server finish sending? (FIN)
-                            if flags & rudp_lib.FLAG_FIN:
-                                print(
-                                    "\n[*] Received FIN flag. File transfer complete."
-                                )
-                                print("[*] Sending final ACK...")
-                                ack_packet = rudp_lib.create_packet(
-                                    0, seq_num, rudp_lib.FLAG_ACK
-                                )
-                                client_socket.sendto(ack_packet, server_addr)
-                                break
+                # 3. Is this a data packet (DATA)?
+                if flags & rudp_lib.FLAG_DATA:
+                    # Order checking (Go-Back-N Logic)
+                    if seq_num == expected_seq:
+                        # The packet arrived in the correct order! Save it
+                        f.write(data)
+                        print(f"  [+] Received packet {seq_num} (Valid). Sending ACK.")
 
-                            # 3. Is this a data packet (DATA)?
-                            if flags & rudp_lib.FLAG_DATA:
-                                # Order checking (Go-Back-N Logic)
-                                if seq_num == expected_seq:
-                                    # The packet arrived in the correct order! Save it
-                                    f.write(data)
-                                    print(
-                                        f"  [+] Received packet {seq_num} (Valid). Sending ACK."
-                                    )
+                        expected_seq += (
+                            1  # Increment the counter *before* sending the confirmation
+                        )
 
-                                    expected_seq += 1  # Increment the counter *before* sending the confirmation
+                        # Send ACK with the next number we expect (new expected_seq)
+                        ack_packet = rudp_lib.create_packet(
+                            0, expected_seq, rudp_lib.FLAG_ACK
+                        )
+                        client_socket.sendto(ack_packet, server_addr)
 
-                                    # Send ACK with the next number we expect (new expected_seq)
-                                    ack_packet = rudp_lib.create_packet(
-                                        0, expected_seq, rudp_lib.FLAG_ACK
-                                    )
-                                    client_socket.sendto(ack_packet, server_addr)
-
-                                else:
-                                    # Out of order packet!
-                                    print(
-                                        f"  [-] Out of order! Expected {expected_seq}, got {seq_num}. Dropping."
-                                    )
-                                    # Send ACK again to inform the server which packet we're still waiting for
-                                    ack_packet = rudp_lib.create_packet(
-                                        0, expected_seq, rudp_lib.FLAG_ACK
-                                    )
-                                    client_socket.sendto(ack_packet, server_addr)
-
-                        except socket.timeout:
-                            print(
-                                "\n[-] RUDP Timeout: No packets received from server."
-                            )
-                            break
-                        except Exception as e:
-                            print(f"\n[-] RUDP Client error: {e}")
-                            break
+                    else:
+                        # Out of order packet!
+                        print(
+                            f"  [-] Out of order! Expected {expected_seq}, got {seq_num}. Dropping."
+                        )
+                        # Send ACK again to inform the server which packet we're still waiting for
+                        ack_packet = rudp_lib.create_packet(
+                            0, expected_seq, rudp_lib.FLAG_ACK
+                        )
+                        client_socket.sendto(ack_packet, server_addr)
 
             except socket.timeout:
                 print("\n[-] RUDP Timeout: No packets received from server.")

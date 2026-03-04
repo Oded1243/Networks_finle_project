@@ -18,7 +18,7 @@ def setup_server_directory():
     if not os.path.exists(SERVER_DIR):
         os.makedirs(SERVER_DIR)
         with open(os.path.join(SERVER_DIR, "test_file.txt"), "w") as f:
-            f.write("Balex fag\n" * 50)
+            f.write("Balex\n" * 50)
         print(f"[*] Created directory '{SERVER_DIR}' with a dummy file.")
 
 
