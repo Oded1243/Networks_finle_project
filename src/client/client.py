@@ -247,7 +247,7 @@ def rudp_object_client(server_ip, object_key):
 
     print(f"[*] Sending RUDP SYN request for GET '{object_key}'...")
     req_data = f"GET {object_key}".encode("utf-8")
-    syn_packet = rudp_lib.create_packet(0, 0, rudp_lib.FLAG_SYN, req_data)
+    syn_packet = rudp_lib.create_packet(0, 0, rudp_lib.FLAG_SYN, 64000, req_data)
     client_socket.sendto(syn_packet, server_addr)
 
     expected_seq = 1
@@ -258,11 +258,16 @@ def rudp_object_client(server_ip, object_key):
         while True:
             try:
                 packet_bytes, _ = client_socket.recvfrom(65535)
-                seq_num, ack_num, flags, data = rudp_lib.parse_packet(packet_bytes)
+                parsed = rudp_lib.parse_packet(packet_bytes)
+                if parsed is None:
+                    continue
+                seq_num, ack_num, flags, _, data = parsed
 
                 if flags & rudp_lib.FLAG_FIN:
                     print("\n[*] Received FIN. Transfer complete.")
-                    ack_packet = rudp_lib.create_packet(0, seq_num, rudp_lib.FLAG_ACK)
+                    ack_packet = rudp_lib.create_packet(
+                        0, seq_num, rudp_lib.FLAG_ACK, 64000
+                    )
                     client_socket.sendto(ack_packet, server_addr)
                     break
 
@@ -272,7 +277,7 @@ def rudp_object_client(server_ip, object_key):
                         print(f"  [+] Packet {seq_num} received. Sending ACK.")
                         expected_seq += 1
                         ack_packet = rudp_lib.create_packet(
-                            0, expected_seq, rudp_lib.FLAG_ACK
+                            0, expected_seq, rudp_lib.FLAG_ACK, 64000
                         )
                         client_socket.sendto(ack_packet, server_addr)
                     else:
@@ -280,7 +285,7 @@ def rudp_object_client(server_ip, object_key):
                             f"  [-] Out of order! Expected {expected_seq}, got {seq_num}."
                         )
                         ack_packet = rudp_lib.create_packet(
-                            0, expected_seq, rudp_lib.FLAG_ACK
+                            0, expected_seq, rudp_lib.FLAG_ACK, 64000
                         )
                         client_socket.sendto(ack_packet, server_addr)
 

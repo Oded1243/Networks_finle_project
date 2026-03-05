@@ -264,7 +264,10 @@ def start_rudp_server():
         try:
             server_socket.settimeout(None)
             packet_bytes, client_addr = server_socket.recvfrom(65535)
-            seq, ack, flags, data = rudp_lib.parse_packet(packet_bytes)
+            parsed = rudp_lib.parse_packet(packet_bytes)
+            if parsed is None:
+                continue
+            seq, ack, flags, _, data = parsed
 
             if flags & rudp_lib.FLAG_SYN:
                 request = data.decode("utf-8")
@@ -297,12 +300,22 @@ def start_rudp_server():
 
                                 base = 1
                                 next_seq_num = 1
-                                window_size = 2
-                                max_window_size = 10
+                                window_size = 2.0  # Use float for congestion control
+                                slow_start_threshold = 16
+                                dup_ack_count = 0
+                                last_ack_recvd = 0
+                                client_rwnd = 1000  # Initial assumption
+
+                                server_socket.settimeout(0.5)
 
                                 while base <= total_packets:
+                                    # Explicit Flow Control using received window size
+                                    effective_window = min(
+                                        int(window_size), client_rwnd
+                                    )
+
                                     while (
-                                        next_seq_num < base + window_size
+                                        next_seq_num < base + effective_window
                                         and next_seq_num <= total_packets
                                     ):
                                         chunk_data = chunks[next_seq_num - 1]
@@ -310,10 +323,11 @@ def start_rudp_server():
                                             next_seq_num,
                                             0,
                                             rudp_lib.FLAG_DATA,
+                                            64000,  # My receive window
                                             chunk_data,
                                         )
 
-                                        if random.randint(1, 100) < 10:
+                                        if random.randint(1, 100) < 5:
                                             print(
                                                 f"  [X] LOSS: Dropped {next_seq_num}."
                                             )
@@ -322,26 +336,73 @@ def start_rudp_server():
                                             print(f"  [>] Sent {next_seq_num}")
                                         next_seq_num += 1
 
-                                    server_socket.settimeout(0.5)
                                     try:
                                         ack_bytes, _ = server_socket.recvfrom(65535)
-                                        _, ack_num, ack_flags, _ = (
-                                            rudp_lib.parse_packet(ack_bytes)
-                                        )
+                                        parsed = rudp_lib.parse_packet(ack_bytes)
+
+                                        # Checksum verification handling
+                                        if parsed is None:
+                                            print("  [!] Corrupted ACK. Iconsoring.")
+                                            continue
+
+                                        _, ack_num, ack_flags, r_window, _ = parsed
+
+                                        # Update client flow window
+                                        # If window=0, we should treat it carefully (persist timer), but here just min(1, ..)
+                                        client_rwnd = max(1, r_window)
 
                                         if ack_flags & rudp_lib.FLAG_ACK:
                                             if ack_num > base:
                                                 base = ack_num
-                                                if window_size < max_window_size:
+                                                dup_ack_count = 0
+                                                last_ack_recvd = ack_num
+
+                                                # Congestion Control
+                                                if window_size < slow_start_threshold:
                                                     window_size += 1
+                                                else:
+                                                    window_size += 1.0 / window_size
+
+                                            elif ack_num == last_ack_recvd:
+                                                dup_ack_count += 1
+                                                if dup_ack_count == 3:
+                                                    # Fast Retransmit
+                                                    print(
+                                                        f"  [!] Fast Retransmit: Resending {base}"
+                                                    )
+                                                    # Resend the packet that is missing (base)
+                                                    if base <= total_packets:
+                                                        chunk_data = chunks[base - 1]
+                                                        packet = rudp_lib.create_packet(
+                                                            base,
+                                                            0,
+                                                            rudp_lib.FLAG_DATA,
+                                                            64000,
+                                                            chunk_data,
+                                                        )
+                                                        server_socket.sendto(
+                                                            packet, client_addr
+                                                        )
+
+                                                    # Fast Recovery adjustment
+                                                    slow_start_threshold = max(
+                                                        int(window_size) // 2, 2
+                                                    )
+                                                    window_size = slow_start_threshold
+                                                    # Do not reset next_seq_num fully, just retransmit missing
+
                                     except socket.timeout:
                                         print(f"  [!] Timeout! Resending from {base}.")
-                                        window_size = max(1, window_size // 2)
+                                        slow_start_threshold = max(
+                                            int(window_size) // 2, 2
+                                        )
+                                        window_size = 1
                                         next_seq_num = base
+                                        dup_ack_count = 0
 
                                 print("[*] RUDP: Transfer complete. Sending FIN.")
                                 fin_packet = rudp_lib.create_packet(
-                                    0, 0, rudp_lib.FLAG_FIN
+                                    0, 0, rudp_lib.FLAG_FIN, 0
                                 )
                                 server_socket.sendto(fin_packet, client_addr)
                             else:

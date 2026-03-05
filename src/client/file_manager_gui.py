@@ -287,7 +287,9 @@ class NetworkClient:
             server_addr = (self.server_ip, OBJ_RUDP_PORT)
 
             req_data = f"GET {filename}".encode("utf-8")
-            syn_packet = rudp_lib.create_packet(0, 0, rudp_lib.FLAG_SYN, req_data)
+            syn_packet = rudp_lib.create_packet(
+                0, 0, rudp_lib.FLAG_SYN, 64000, req_data
+            )
             client_socket.sendto(syn_packet, server_addr)
 
             expected_seq = 1
@@ -297,13 +299,14 @@ class NetworkClient:
                 while True:
                     try:
                         packet_bytes, _ = client_socket.recvfrom(65535)
-                        seq_num, ack_num, flags, data = rudp_lib.parse_packet(
-                            packet_bytes
-                        )
+                        parsed = rudp_lib.parse_packet(packet_bytes)
+                        if parsed is None:
+                            continue
+                        seq_num, ack_num, flags, _, data = parsed
 
                         if flags & rudp_lib.FLAG_FIN:
                             ack_packet = rudp_lib.create_packet(
-                                0, seq_num, rudp_lib.FLAG_ACK
+                                0, seq_num, rudp_lib.FLAG_ACK, 64000
                             )
                             client_socket.sendto(ack_packet, server_addr)
                             self.log("[*] Received FIN. Transfer complete.")
@@ -314,13 +317,13 @@ class NetworkClient:
                                 f.write(data)
                                 expected_seq += 1
                                 ack_packet = rudp_lib.create_packet(
-                                    0, expected_seq, rudp_lib.FLAG_ACK
+                                    0, expected_seq, rudp_lib.FLAG_ACK, 64000
                                 )
                                 client_socket.sendto(ack_packet, server_addr)
                             else:
                                 # Simple Go-Back-N or Stop-and-Wait logic simulation (ACK expected)
                                 ack_packet = rudp_lib.create_packet(
-                                    0, expected_seq, rudp_lib.FLAG_ACK
+                                    0, expected_seq, rudp_lib.FLAG_ACK, 64000
                                 )
                                 client_socket.sendto(ack_packet, server_addr)
                     except socket.timeout:
