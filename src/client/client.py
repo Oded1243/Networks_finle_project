@@ -14,8 +14,8 @@ import rudp_lib
 
 # --- Constants ---
 # Ports
-DHCP_SERVER_PORT = 67
-DHCP_CLIENT_PORT = 68
+DHCP_SERVER_PORT = int(os.environ.get("DHCP_SERVER_PORT", 67))
+DHCP_CLIENT_PORT = int(os.environ.get("DHCP_CLIENT_PORT", 68))
 DNS_PORT = 5053
 OBJ_TCP_PORT = 2121
 OBJ_RUDP_PORT = 2122

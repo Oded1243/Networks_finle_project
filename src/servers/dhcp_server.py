@@ -1,11 +1,12 @@
 import binascii
 import socket
 import struct
+import os
 
 # --- Constants to avoid "magic numbers" (Magic Numbers) ---
 # Ports
-DHCP_SERVER_PORT = 67
-DHCP_CLIENT_PORT = 68
+DHCP_SERVER_PORT = int(os.environ.get("DHCP_SERVER_PORT", 67))
+DHCP_CLIENT_PORT = int(os.environ.get("DHCP_CLIENT_PORT", 68))
 
 # Types of operations (OP Codes)
 OP_BOOTREQUEST = 1  # Request from client
