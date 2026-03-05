@@ -470,10 +470,10 @@ class StorageGUI:
         )
         self.lbl_status.pack(side=tk.LEFT, padx=(0, 15))
 
-        self.btn_connect = ttk.Button(
-            status_frame, text="Connect to Network", command=self.start_connection
-        )
-        self.btn_connect.pack(side=tk.LEFT)
+        # self.btn_connect = ttk.Button(
+        #     status_frame, text="Connect to Network", command=self.start_connection
+        # )
+        # self.btn_connect.pack(side=tk.LEFT)
 
         # --- Icons ---
         self.icons = {}
@@ -626,6 +626,9 @@ class StorageGUI:
         self.txt_log.pack(in_=log_border, padx=1, pady=1, fill=tk.X)
         log_border.pack(fill=tk.X)
 
+        # Start connection immediately
+        self.root.after(100, self.start_connection)
+
     def log_message(self, msg):
         self.txt_log.config(state="normal")
         self.txt_log.insert(tk.END, msg + "\n")
@@ -634,7 +637,7 @@ class StorageGUI:
         print(msg)  # verify in terminal too
 
     def start_connection(self):
-        self.btn_connect.config(state="disabled")
+        # self.btn_connect.config(state="disabled")
         self.lbl_status.config(text="Status: Connecting...", foreground="orange")
         threading.Thread(target=self._connect_thread, daemon=True).start()
 
@@ -649,12 +652,12 @@ class StorageGUI:
         self.lbl_status.config(
             text=f"● Connected ({self.client.server_ip})", foreground="#28a745"
         )
-        self.btn_connect.config(state="normal", text="Reconnect")
+        # self.btn_connect.config(state="normal", text="Reconnect")
         self.refresh_lists()
 
     def _on_connect_fail(self):
         self.lbl_status.config(text="● Connection Failed", foreground="#dc3545")
-        self.btn_connect.config(state="normal")
+        # self.btn_connect.config(state="normal")
         messagebox.showerror(
             "Connection Error",
             "Could not connect to DHCP or DNS server.\nEnsure servers are running.",
