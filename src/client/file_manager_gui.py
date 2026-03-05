@@ -470,11 +470,6 @@ class StorageGUI:
         )
         self.lbl_status.pack(side=tk.LEFT, padx=(0, 15))
 
-        # self.btn_connect = ttk.Button(
-        #     status_frame, text="Connect to Network", command=self.start_connection
-        # )
-        # self.btn_connect.pack(side=tk.LEFT)
-
         # --- Icons ---
         self.icons = {}
 
@@ -637,7 +632,6 @@ class StorageGUI:
         print(msg)  # verify in terminal too
 
     def start_connection(self):
-        # self.btn_connect.config(state="disabled")
         self.lbl_status.config(text="Status: Connecting...", foreground="orange")
         threading.Thread(target=self._connect_thread, daemon=True).start()
 
@@ -652,12 +646,10 @@ class StorageGUI:
         self.lbl_status.config(
             text=f"● Connected ({self.client.server_ip})", foreground="#28a745"
         )
-        # self.btn_connect.config(state="normal", text="Reconnect")
         self.refresh_lists()
 
     def _on_connect_fail(self):
         self.lbl_status.config(text="● Connection Failed", foreground="#dc3545")
-        # self.btn_connect.config(state="normal")
         messagebox.showerror(
             "Connection Error",
             "Could not connect to DHCP or DNS server.\nEnsure servers are running.",
@@ -665,21 +657,6 @@ class StorageGUI:
 
     def refresh_lists(self):
         threading.Thread(target=self._refresh_thread, daemon=True).start()
-
-    def _refresh_thread(self):
-        if not self.client.connected:
-            return
-
-        files = self.client.list_files()
-
-        self.root.after(0, lambda: self._update_lists(files))
-
-    def _update_lists(self, files):
-        for item in self.tree_files.get_children():
-            self.tree_files.delete(item)
-
-        for name, size in files:
-            self.tree_files.insert("", tk.END, values=(name, size))
 
     def on_file_select(self, event):
         selected = self.tree_files.selection()
