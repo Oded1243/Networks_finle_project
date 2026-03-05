@@ -1,10 +1,11 @@
 import os
 import random
-import socket
-import threading
-import sys
-import sqlite3
 import shutil
+import socket
+import sqlite3
+import sys
+import threading
+import time
 
 # Add common directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
@@ -437,6 +438,6 @@ if __name__ == "__main__":
 
     try:
         while True:
-            pass
+            time.sleep(1)
     except KeyboardInterrupt:
         print("\n[-] Shutting down servers.")
