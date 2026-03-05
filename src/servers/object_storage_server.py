@@ -337,7 +337,12 @@ def start_rudp_server():
                                         next_seq_num += 1
 
                                     try:
-                                        ack_bytes, _ = server_socket.recvfrom(65535)
+                                        ack_bytes, recv_addr = server_socket.recvfrom(
+                                            65535
+                                        )
+                                        if recv_addr != client_addr:
+                                            continue
+
                                         parsed = rudp_lib.parse_packet(ack_bytes)
 
                                         # Checksum verification handling
