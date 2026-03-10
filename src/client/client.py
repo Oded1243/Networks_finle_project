@@ -146,18 +146,6 @@ def resolve_domain(domain):
         return None
 
 
-def create_test_image(filename):
-    """Generates a small valid BMP image for testing."""
-    # Simple BMP Header (1x1 pixel)
-    bmp_header = b"BM\x3e\x00\x00\x00\x00\x00\x00\x00\x36\x00\x00\x00\x28\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x00\x18\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\x00\x00\x00\x00"
-    # Adding padding data to make it larger
-    data = bmp_header + b"\x00" * 1000
-    with open(filename, "wb") as f:
-        f.write(data)
-    print(f"[*] Generated test image '{filename}' ({len(data)} bytes).")
-    return len(data)
-
-
 def tcp_object_client(server_ip):
     """Connects to Object Storage via TCP to manage Replicated Objects."""
     if not os.path.exists(CLIENT_DIR):
@@ -171,67 +159,16 @@ def tcp_object_client(server_ip):
         client_socket.connect((server_ip, OBJ_TCP_PORT))
         print("[+] Connected successfully!\n")
 
-        # Test Image
-        object_key = "test_image.bmp"
-        filesize = create_test_image(object_key)
-
         # 1. LIST_BUCKETS (Replicas)
         print("[*] Storage Nodes (Buckets):")
         client_socket.send("LIST_BUCKETS".encode("utf-8"))
         print(f"{client_socket.recv(BUFFER_SIZE).decode('utf-8')}\n")
 
-        # 2. PUT (Upload Image) - Replicates automatically
-        print(f"[*] PUT: Uploading image '{object_key}'...")
-        client_socket.send(f"PUT {object_key} {filesize}".encode("utf-8"))
-
-        response = client_socket.recv(BUFFER_SIZE).decode("utf-8")
-        if response == "READY":
-            with open(object_key, "rb") as f:
-                client_socket.sendall(f.read())
-            print(f"[TCP] {client_socket.recv(BUFFER_SIZE).decode('utf-8')}")
-        else:
-            print(f"[-] Server not ready: {response}")
-
-        # 3. LIST Objects
+        # 2. LIST Objects
         print(f"[*] LIST objects...")
         client_socket.send("LIST".encode("utf-8"))
         local_list = client_socket.recv(BUFFER_SIZE).decode("utf-8")
         print(f"-- Objects --\n{local_list}\n-------------")
-
-        # 4. GET (Download Image)
-        if object_key in local_list:
-            print(f"\n[*] GET: Downloading image '{object_key}'...")
-            client_socket.send(f"GET {object_key}".encode("utf-8"))
-
-            response = client_socket.recv(BUFFER_SIZE).decode("utf-8")
-            if response.startswith("OK"):
-                size = int(response.split(" ")[1])
-                print(f"[+] Server ready. Object size: {size} bytes")
-                client_socket.send("READY".encode("utf-8"))
-
-                filepath = os.path.join(CLIENT_DIR, object_key)
-                with open(filepath, "wb") as f:
-                    bytes_received = 0
-                    while bytes_received < size:
-                        chunk = client_socket.recv(
-                            min(size - bytes_received, BUFFER_SIZE)
-                        )
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        bytes_received += len(chunk)
-                print(f"[V] Downloaded to '{CLIENT_DIR}'.")
-            else:
-                print(f"[-] Server refused GET: {response}")
-
-        # 5. DELETE Object (Removes all replicas)
-        print(f"\n[*] DELETE: Deleting '{object_key}'...")
-        client_socket.send(f"DELETE {object_key}".encode("utf-8"))
-        print(f"[TCP] {client_socket.recv(BUFFER_SIZE).decode('utf-8')}")
-
-        # Cleanup local file
-        if os.path.exists(object_key):
-            os.remove(object_key)
 
         client_socket.send("QUIT".encode("utf-8"))
         print("[*] TCP Session Closed.")
@@ -245,26 +182,6 @@ def tcp_object_client(server_ip):
 def rudp_object_client(server_ip, object_key):
     """Connects via RUDP to GET an object (image)."""
     print(f"\n--- Phase 4: Object Storage Client (RUDP) ---")
-
-    # Pre-check: Ensure the object exists using TCP for the test
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((server_ip, OBJ_TCP_PORT))
-
-        # Re-upload image
-        filesize = create_test_image(object_key)
-        sock.send(f"PUT {object_key} {filesize}".encode("utf-8"))
-        if sock.recv(1024) == b"READY":
-            with open(object_key, "rb") as f:
-                sock.sendall(f.read())
-            sock.recv(1024)
-        sock.close()
-        print(f"[*] (Setup) Re-uploaded '{object_key}' via TCP.")
-        if os.path.exists(object_key):
-            os.remove(object_key)
-
-    except Exception as e:
-        print(f"[-] Setup failed: {e}")
 
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.settimeout(5.0)
@@ -336,9 +253,6 @@ if __name__ == "__main__":
 
         if server_ip:
             tcp_object_client(server_ip)
-
-            # Since TCP connection deletes the file at the end, run RUDP test
-            rudp_object_client(server_ip, "test_image.bmp")
         else:
             print("[!] DNS Resolution failed.")
     else:
