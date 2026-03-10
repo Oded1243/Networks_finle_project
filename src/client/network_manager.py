@@ -67,7 +67,7 @@ class NetworkManager:
         self.my_ip = None
         self.connected = False
         self.retry_interval = 5  # seconds
-        self.max_retries = 6  # None = infinite retries
+        self.max_retries = None  # None = infinite retries
 
     def log(self, message):
         if self.log_callback:
