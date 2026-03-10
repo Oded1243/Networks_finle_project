@@ -66,12 +66,42 @@ class NetworkManager:
         self.server_ip = None
         self.my_ip = None
         self.connected = False
+        self.retry_interval = 5  # seconds
+        self.max_retries = 6  # None = infinite retries
 
     def log(self, message):
         if self.log_callback:
             self.log_callback(message)
         else:
             print(message)
+
+    def _retry_with_interval(self, func, func_name, *args, **kwargs):
+        """
+        Retry a function with 5-second intervals on failure.
+        Displays retry attempts to the user.
+        """
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                result = func(*args, **kwargs)
+                if result is not None:
+                    return result
+                else:
+                    # None result means failure, retry
+                    self.log(
+                        f"[!] {func_name} failed. Retrying in {self.retry_interval} seconds..."
+                    )
+                    time.sleep(self.retry_interval)
+            except Exception as e:
+                self.log(
+                    f"[!] {func_name} error: {e}. Retrying in {self.retry_interval} seconds..."
+                )
+                time.sleep(self.retry_interval)
+
+            if self.max_retries is not None and attempt >= self.max_retries:
+                self.log(f"[-] {func_name} failed after {self.max_retries} attempts.")
+                return None
 
     def _create_dhcp_request(self, xid, mac_bytes, message_type):
         header = bytes([OP_BOOTREQUEST, HTYPE_ETHERNET, HLEN_MAC, 0])
@@ -86,8 +116,8 @@ class NetworkManager:
         options += bytes([OPT_END])
         return header + xid_secs_flags + ips + chaddr + sname_file_cookie + options
 
-    def perform_dhcp_handshake(self):
-        self.log("--- Phase 1: DHCP Handshake ---")
+    def _perform_dhcp_handshake_single(self):
+        """Single DHCP handshake attempt (without retries)"""
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -142,7 +172,15 @@ class NetworkManager:
         finally:
             client_socket.close()
 
-    def resolve_domain(self, domain="object.store"):
+    def perform_dhcp_handshake(self):
+        """DHCP handshake with automatic retries on failure"""
+        self.log("--- Phase 1: DHCP Handshake ---")
+        return self._retry_with_interval(
+            self._perform_dhcp_handshake_single, "DHCP Handshake"
+        )
+
+    def _resolve_domain_single(self, domain="object.store"):
+        """Single DNS resolution attempt (without retries)"""
         self.log(f"--- Phase 2: DNS Resolution for '{domain}' ---")
         q = DNSRecord.question(domain)
         try:
@@ -161,6 +199,12 @@ class NetworkManager:
             self.log(f"[-] DNS Error: {e}")
             return None
 
+    def resolve_domain(self, domain="object.store"):
+        """DNS resolution with automatic retries on failure"""
+        return self._retry_with_interval(
+            self._resolve_domain_single, f"DNS Resolution for '{domain}'", domain
+        )
+
     def connect_sequence(self):
         ip = self.perform_dhcp_handshake()
         if not ip:
@@ -173,7 +217,8 @@ class NetworkManager:
         self.connected = True
         return True
 
-    def tcp_send_command(self, cmd, data=None):
+    def _tcp_send_command_single(self, cmd, data=None):
+        """Single TCP command attempt (without retries)"""
         if not self.server_ip:
             self.log("[-] Not connected to server.")
             return None
@@ -202,6 +247,12 @@ class NetworkManager:
         except Exception as e:
             self.log(f"[-] TCP Error: {e}")
             return None
+
+    def tcp_send_command(self, cmd, data=None):
+        """TCP command with automatic retries on connection failure"""
+        return self._retry_with_interval(
+            self._tcp_send_command_single, "TCP Command", cmd, data
+        )
 
     def list_buckets(self):
         res = self.tcp_send_command("LIST_BUCKETS")
@@ -265,8 +316,8 @@ class NetworkManager:
         self.log(f"[Server] {res}")
         return "SUCCESS" in (res or "")
 
-    def download_file_tcp(self, filename, save_path):
-        self.log(f"[*] GET (TCP): Downloading {filename}...")
+    def _download_file_tcp_single(self, filename, save_path):
+        """Single TCP download attempt (without retries)"""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((self.server_ip, OBJ_TCP_PORT))
@@ -290,14 +341,25 @@ class NetworkManager:
 
                 elapsed = time.time() - start_time
                 self.log(f"[+] Download complete: {save_path} ({elapsed:.2f}s)")
+                s.close()
+                return True
             else:
                 self.log(f"[-] Server Error: {response}")
-            s.close()
+                s.close()
+                return None
         except Exception as e:
             self.log(f"[-] TCP Download Error: {e}")
+            return None
 
-    def download_file_rudp(self, filename, save_path):
-        self.log(f"[*] GET (RUDP): Downloading {filename}...")
+    def download_file_tcp(self, filename, save_path):
+        """TCP download with automatic retries on connection failure"""
+        self.log(f"[*] GET (TCP): Downloading {filename}...")
+        return self._retry_with_interval(
+            self._download_file_tcp_single, "TCP Download", filename, save_path
+        )
+
+    def _download_file_rudp_single(self, filename, save_path):
+        """Single RUDP download attempt (without retries)"""
         try:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             client_socket.settimeout(5.0)
@@ -349,12 +411,21 @@ class NetworkManager:
 
             elapsed = time.time() - start_time
             self.log(f"[+] RUDP Download complete: {save_path} ({elapsed:.2f}s)")
-
+            client_socket.close()
+            return True
         except Exception as e:
             self.log(f"[-] RUDP Download Error: {e}")
+            return None
 
-    def fetch_file_bytes(self, filename):
-        # Helper to fetch file content in memory for preview
+    def download_file_rudp(self, filename, save_path):
+        """RUDP download with automatic retries on connection failure"""
+        self.log(f"[*] GET (RUDP): Downloading {filename}...")
+        return self._retry_with_interval(
+            self._download_file_rudp_single, "RUDP Download", filename, save_path
+        )
+
+    def _fetch_file_bytes_single(self, filename):
+        """Single fetch attempt (without retries)"""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((self.server_ip, OBJ_TCP_PORT))
@@ -383,3 +454,10 @@ class NetworkManager:
                 return None
         except Exception:
             return None
+
+    def fetch_file_bytes(self, filename):
+        """Fetch file bytes with automatic retries on connection failure"""
+        # Helper to fetch file content in memory for preview
+        return self._retry_with_interval(
+            self._fetch_file_bytes_single, "Fetch File Bytes", filename
+        )
