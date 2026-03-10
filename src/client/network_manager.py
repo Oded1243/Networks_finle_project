@@ -1,5 +1,4 @@
 import socket
-import struct
 import time
 import random
 import os
@@ -35,6 +34,32 @@ OPT_MESSAGE_TYPE = 53
 OPT_END = 255
 
 
+def _ip_to_bytes(ip_str):
+    """Convert IP string to 4 bytes."""
+    parts = ip_str.split(".")
+    return bytes([int(p) for p in parts])
+
+
+def _bytes_to_ip(data):
+    """Convert 4 bytes to IP string."""
+    return ".".join(str(b) for b in data[:4])
+
+
+def _pack_uint32_be(value):
+    """Pack 32-bit unsigned integer as big-endian bytes."""
+    return value.to_bytes(4, "big")
+
+
+def _pack_uint16_be(value):
+    """Pack 16-bit unsigned integer as big-endian bytes."""
+    return value.to_bytes(2, "big")
+
+
+def _pack_uint8(value):
+    """Pack 8-bit unsigned integer as bytes."""
+    return bytes([value & 0xFF])
+
+
 class NetworkManager:
     def __init__(self, log_callback=None):
         self.log_callback = log_callback
@@ -49,14 +74,16 @@ class NetworkManager:
             print(message)
 
     def _create_dhcp_request(self, xid, mac_bytes, message_type):
-        header = struct.pack("!BBBB", OP_BOOTREQUEST, HTYPE_ETHERNET, HLEN_MAC, 0)
-        xid_secs_flags = struct.pack("!IHH", xid, 0, 0x8000)
-        zero_ip = socket.inet_aton("0.0.0.0")
-        ips = struct.pack("!4s4s4s4s", zero_ip, zero_ip, zero_ip, zero_ip)
+        header = bytes([OP_BOOTREQUEST, HTYPE_ETHERNET, HLEN_MAC, 0])
+        xid_secs_flags = (
+            _pack_uint32_be(xid) + _pack_uint16_be(0) + _pack_uint16_be(0x8000)
+        )
+        zero_ip = _ip_to_bytes("0.0.0.0")
+        ips = zero_ip + zero_ip + zero_ip + zero_ip
         chaddr = mac_bytes + b"\x00" * 10
-        sname_file_cookie = b"\x00" * 192 + struct.pack("!I", 0x63825363)
-        options = struct.pack("!BBB", OPT_MESSAGE_TYPE, 1, message_type)
-        options += struct.pack("!B", OPT_END)
+        sname_file_cookie = b"\x00" * 192 + _pack_uint32_be(0x63825363)
+        options = bytes([OPT_MESSAGE_TYPE, 1, message_type])
+        options += bytes([OPT_END])
         return header + xid_secs_flags + ips + chaddr + sname_file_cookie + options
 
     def perform_dhcp_handshake(self):
@@ -86,7 +113,7 @@ class NetworkManager:
 
             try:
                 offer_data, _ = client_socket.recvfrom(BUFFER_SIZE)
-                offered_ip = socket.inet_ntoa(offer_data[16:20])
+                offered_ip = _bytes_to_ip(offer_data[16:20])
                 self.log(f"[+] Received DHCP OFFER: IP {offered_ip}")
             except socket.timeout:
                 self.log("[-] DHCP Server did not respond to DISCOVER.")

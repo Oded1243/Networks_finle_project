@@ -1,6 +1,5 @@
 import binascii
 import socket
-import struct
 import os
 
 # --- Constants to avoid "magic numbers" (Magic Numbers) ---
@@ -35,6 +34,32 @@ BROADCAST_IP = "255.255.255.255"
 LEASE_TIME_SEC = 3600  # One hour
 
 
+def _ip_to_bytes(ip_str):
+    """Convert IP string to 4 bytes."""
+    parts = ip_str.split(".")
+    return bytes([int(p) for p in parts])
+
+
+def _pack_uint32_be(value):
+    """Pack 32-bit unsigned integer as big-endian bytes."""
+    return value.to_bytes(4, "big")
+
+
+def _pack_uint16_be(value):
+    """Pack 16-bit unsigned integer as big-endian bytes."""
+    return value.to_bytes(2, "big")
+
+
+def _pack_uint8(value):
+    """Pack 8-bit unsigned integer as bytes."""
+    return bytes([value & 0xFF])
+
+
+def _unpack_uint32_be(data):
+    """Unpack big-endian bytes to 32-bit unsigned integer."""
+    return int.from_bytes(data[:4], "big")
+
+
 def get_dhcp_message_type(options_bytes):
     """
     Extracts DHCP message type from the options area.
@@ -60,26 +85,26 @@ def create_dhcp_response(xid, client_mac_bytes, message_type):
     """
     Builds a response packet (Offer or ACK).
     """
-    server_ip_packed = socket.inet_aton(SERVER_IP)
-    offered_ip_packed = socket.inet_aton(OFFERED_IP)
-    zero_ip_packed = socket.inet_aton("0.0.0.0")
+    server_ip_packed = _ip_to_bytes(SERVER_IP)
+    offered_ip_packed = _ip_to_bytes(OFFERED_IP)
+    zero_ip_packed = _ip_to_bytes("0.0.0.0")
 
     # Header: OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, Hops(0)
-    header = struct.pack("!BBBB", OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, 0)
-    xid_secs_flags = struct.pack("!IHH", xid, 0, 0x8000)  # Broadcast flag
+    header = bytes([OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, 0])
+    xid_secs_flags = (
+        _pack_uint32_be(xid) + _pack_uint16_be(0) + _pack_uint16_be(0x8000)
+    )  # Broadcast flag
 
-    ips = struct.pack(
-        "!4s4s4s4s", zero_ip_packed, offered_ip_packed, server_ip_packed, zero_ip_packed
-    )
+    ips = zero_ip_packed + offered_ip_packed + server_ip_packed + zero_ip_packed
 
     chaddr = client_mac_bytes + b"\x00" * 10
-    sname_file_cookie = b"\x00" * 192 + struct.pack("!I", 0x63825363)  # Magic Cookie
+    sname_file_cookie = b"\x00" * 192 + _pack_uint32_be(0x63825363)  # Magic Cookie
 
     # Options
-    options = struct.pack("!BBB", OPT_MESSAGE_TYPE, 1, message_type)
-    options += struct.pack("!BB", OPT_SERVER_ID, 4) + server_ip_packed
-    options += struct.pack("!BB", OPT_LEASE_TIME, 4) + struct.pack("!I", LEASE_TIME_SEC)
-    options += struct.pack("!B", OPT_END)
+    options = bytes([OPT_MESSAGE_TYPE, 1, message_type])
+    options += bytes([OPT_SERVER_ID, 4]) + server_ip_packed
+    options += bytes([OPT_LEASE_TIME, 4]) + _pack_uint32_be(LEASE_TIME_SEC)
+    options += bytes([OPT_END])
 
     return header + xid_secs_flags + ips + chaddr + sname_file_cookie + options
 
@@ -100,7 +125,7 @@ def start_dhcp_server():
 
             op = packet_data[0]
             if op == OP_BOOTREQUEST:
-                xid = struct.unpack("!I", packet_data[4:8])[0]
+                xid = _unpack_uint32_be(packet_data[4:8])
                 client_mac_bytes = packet_data[28:34]
                 mac_str = binascii.hexlify(client_mac_bytes).decode("utf-8")
 
