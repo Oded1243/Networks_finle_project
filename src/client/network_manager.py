@@ -78,6 +78,8 @@ class NetworkManager:
     def _retry_with_interval(self, func, func_name, *args, **kwargs):
         """
         Retry a function with 5-second intervals on failure.
+        Returns None only on retries. Returns False immediately (no retry)
+        when the server gives a definitive error.
         Displays retry attempts to the user.
         """
         attempt = 0
@@ -85,10 +87,13 @@ class NetworkManager:
             attempt += 1
             try:
                 result = func(*args, **kwargs)
+                if result is False:
+                    # Definitive failure (server responded with an error), don't retry
+                    return None
                 if result is not None:
                     return result
                 else:
-                    # None result means failure, retry
+                    # None result means transient failure, retry
                     self.log(
                         f"[!] {func_name} failed. Retrying in {self.retry_interval} seconds..."
                     )
@@ -346,7 +351,7 @@ class NetworkManager:
             else:
                 self.log(f"[-] Server Error: {response}")
                 s.close()
-                return None
+                return False  # Server responded with an error; don't retry
         except Exception as e:
             self.log(f"[-] TCP Download Error: {e}")
             return None
@@ -407,7 +412,8 @@ class NetworkManager:
                                 client_socket.sendto(ack_packet, server_addr)
                     except socket.timeout:
                         self.log("[-] RUDP Timeout.")
-                        break
+                        client_socket.close()
+                        return None  # Timeout means incomplete transfer; retry
 
             elapsed = time.time() - start_time
             self.log(f"[+] RUDP Download complete: {save_path} ({elapsed:.2f}s)")
@@ -451,7 +457,7 @@ class NetworkManager:
                 return data
             else:
                 s.close()
-                return None
+                return False  # Server responded with an error; don't retry
         except Exception:
             return None
 

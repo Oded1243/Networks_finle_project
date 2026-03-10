@@ -304,7 +304,7 @@ def start_rudp_server():
                                 window_size = 2.0  # Use float for congestion control
                                 slow_start_threshold = 16
                                 dup_ack_count = 0
-                                last_ack_recvd = 0
+                                last_ack_recvd = 1  # Must match base so dup ACKs are detected from the start
                                 client_rwnd = 1000  # Initial assumption
 
                                 server_socket.settimeout(0.5)
@@ -348,7 +348,7 @@ def start_rudp_server():
 
                                         # Checksum verification handling
                                         if parsed is None:
-                                            print("  [!] Corrupted ACK. Iconsoring.")
+                                            print("  [!] Corrupted ACK. Ignoring.")
                                             continue
 
                                         _, ack_num, ack_flags, r_window, _ = parsed
@@ -415,6 +415,11 @@ def start_rudp_server():
                                 print(f"[-] RUDP: File error on disk.")
                         else:
                             print(f"[-] RUDP: Object '{key}' not found.")
+                            # Send FIN so the client doesn't hang waiting
+                            fin_packet = rudp_lib.create_packet(
+                                0, 0, rudp_lib.FLAG_FIN, 0
+                            )
+                            server_socket.sendto(fin_packet, client_addr)
                     else:
                         print(f"[-] RUDP: Invalid request format: {request}")
 
