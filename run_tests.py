@@ -50,8 +50,7 @@ def main():
     print("=== Starting Network Project Test ===")
     install_dependencies()
 
-    admin = is_admin()
-    if not admin:
+    if not is_admin():
         print("[!] Not running as Administrator. Switching to non-privileged ports.")
         os.environ["DHCP_SERVER_PORT"] = "6700"
         os.environ["DHCP_CLIENT_PORT"] = "6800"
@@ -86,9 +85,6 @@ def main():
         time.sleep(2)
 
         print("\n[*] Starting Client...")
-        # Client we want to see the output of in THIS window potentially,
-        # but the other servers log to their own windows.
-        # Let's run client in this window to see the "flow".
         subprocess.call([sys.executable, "src/client/client.py"])
 
     except KeyboardInterrupt:
@@ -97,8 +93,6 @@ def main():
         print(f"[-] Error: {e}")
     finally:
         print("\n[*] Cleaning up...")
-        # Since we used 'start' shell=True on Windows, we can't easily kill the spawned windows from here
-        # without more complex logic, but we can tell the user to close them.
         print(
             "[!] Please manually close the opened server windows (DHCP, DNS, Object Storage)."
         )

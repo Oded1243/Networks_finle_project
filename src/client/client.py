@@ -5,34 +5,28 @@ import socket
 import time
 import sys
 
-# Add common directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
 from dnslib import DNSRecord
 import rudp_lib
 
-# --- Constants ---
-# Ports
 DHCP_SERVER_PORT = int(os.environ.get("DHCP_SERVER_PORT", 67))
 DHCP_CLIENT_PORT = int(os.environ.get("DHCP_CLIENT_PORT", 68))
 DNS_PORT = 5053
 OBJ_TCP_PORT = 2121
 OBJ_RUDP_PORT = 2122
 
-# Network and file settings
 LOCAL_HOST = "127.0.0.1"
 BROADCAST_IP = "255.255.255.255"
 CLIENT_DIR = "client_objects"
 BUFFER_SIZE = 4096
 
-# DHCP message types
 OP_BOOTREQUEST = 1
 HTYPE_ETHERNET = 1
 HLEN_MAC = 6
 DHCP_DISCOVER = 1
 DHCP_REQUEST = 3
 
-# DHCP Options
 OPT_MESSAGE_TYPE = 53
 OPT_END = 255
 
@@ -159,12 +153,10 @@ def tcp_object_client(server_ip):
         client_socket.connect((server_ip, OBJ_TCP_PORT))
         print("[+] Connected successfully!\n")
 
-        # 1. LIST_BUCKETS (Replicas)
         print("[*] Storage Nodes (Buckets):")
         client_socket.send("LIST_BUCKETS".encode("utf-8"))
         print(f"{client_socket.recv(BUFFER_SIZE).decode('utf-8')}\n")
 
-        # 2. LIST Objects
         print(f"[*] LIST objects...")
         client_socket.send("LIST".encode("utf-8"))
         local_list = client_socket.recv(BUFFER_SIZE).decode("utf-8")
@@ -247,7 +239,6 @@ if __name__ == "__main__":
     my_ip = perform_dhcp_handshake()
 
     if my_ip:
-        # Use new domain name
         target_domain = "object.store"
         server_ip = resolve_domain(target_domain)
 

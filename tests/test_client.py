@@ -14,9 +14,6 @@ def test_dns_query():
 
     print("Sending to 127.0.0.1 on port 5053...")
     try:
-        # Note: This requires the DNS server to be running.
-        # If this is a unit test, we should mock the socket or start the server.
-        # For now, we keep the existing logic but wrapped in a test function.
         answer_bytes = q.send("127.0.0.1", 5053, tcp=False, timeout=3)
         print("\n--- Success! Received Response ---")
 

@@ -5,7 +5,6 @@ import os
 import re
 import sys
 
-# Add common directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
 try:
@@ -14,7 +13,6 @@ try:
 except ImportError as e:
     print(f"Warning: Failed to import required modules: {e}")
 
-# --- Constants ---
 DHCP_SERVER_PORT = 67
 DHCP_CLIENT_PORT = 68
 DNS_PORT = 5053
@@ -24,7 +22,6 @@ LOCAL_HOST = "127.0.0.1"
 BROADCAST_IP = "255.255.255.255"
 BUFFER_SIZE = 4096
 
-# DHCP Constants
 OP_BOOTREQUEST = 1
 HTYPE_ETHERNET = 1
 HLEN_MAC = 6
@@ -66,8 +63,8 @@ class NetworkManager:
         self.server_ip = None
         self.my_ip = None
         self.connected = False
-        self.retry_interval = 5  # seconds
-        self.max_retries = None  # None = infinite retries
+        self.retry_interval = 5
+        self.max_retries = None
 
     def log(self, message):
         if self.log_callback:
@@ -126,13 +123,10 @@ class NetworkManager:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # Bind to 0.0.0.0 to receive broadcast
         try:
             client_socket.bind(("0.0.0.0", DHCP_CLIENT_PORT))
         except OSError:
-            # If port 68 is busy (e.g. real client running), try a random port or fail
             self.log("[-] Warning: Port 68 busy, DHCP might fail or conflict with OS.")
-            # We proceed anyway or raise
 
         client_socket.settimeout(3.0)
 
@@ -233,7 +227,6 @@ class NetworkManager:
             s.connect((self.server_ip, OBJ_TCP_PORT))
             s.send(cmd.encode("utf-8"))
 
-            # If we need to send data (like file content)
             if data:
                 resp = s.recv(BUFFER_SIZE).decode("utf-8")
                 if resp == "READY":
@@ -245,7 +238,6 @@ class NetworkManager:
                     s.close()
                     return resp
 
-            # Simple command response
             response = s.recv(BUFFER_SIZE).decode("utf-8")
             s.close()
             return response
@@ -268,14 +260,12 @@ class NetworkManager:
     def list_files(self):
         res = self.tcp_send_command("LIST")
         if res:
-            # Parse "filename (size bytes)"
             files = []
             for line in res.split("\n"):
                 if "Storage is empty" in line:
                     continue
                 if not line.strip():
                     continue
-                # Parsing logic: "test.png (123 bytes)"
                 try:
                     name_part, size_part = line.rsplit(" (", 1)
                     size = size_part.split(" ")[0]
@@ -291,7 +281,6 @@ class NetworkManager:
             return
 
         filename = os.path.basename(filepath)
-        # Sanitize filename: Replace all non-alphanumeric (except . and - and _) with _
         safe_filename = re.sub(r"[^\w\.-]", "_", filename)
 
         if safe_filename != filename:
@@ -405,8 +394,7 @@ class NetworkManager:
                                 )
                                 client_socket.sendto(ack_packet, server_addr)
                             else:
-                                # Simple Go-Back-N or Stop-and-Wait logic simulation (ACK expected)
-                                ack_packet = rudp_lib.create_packet(
+                                                ack_packet = rudp_lib.create_packet(
                                     0, expected_seq, rudp_lib.FLAG_ACK, 64000
                                 )
                                 client_socket.sendto(ack_packet, server_addr)
@@ -440,7 +428,6 @@ class NetworkManager:
             response = s.recv(BUFFER_SIZE).decode("utf-8")
             if response.startswith("OK"):
                 size = int(response.split(" ")[1])
-                # Safety limit for preview: 2MB
                 if size > 2 * 1024 * 1024:
                     s.close()
                     return None
@@ -463,7 +450,6 @@ class NetworkManager:
 
     def fetch_file_bytes(self, filename):
         """Fetch file bytes with automatic retries on connection failure"""
-        # Helper to fetch file content in memory for preview
         return self._retry_with_interval(
             self._fetch_file_bytes_single, "Fetch File Bytes", filename
         )

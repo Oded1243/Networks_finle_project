@@ -7,12 +7,10 @@ import sys
 import threading
 import time
 
-# Add common directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
-import rudp_lib  # Import our helper library
+import rudp_lib
 
-# --- Constants ---
 OBJ_TCP_PORT = 2121
 OBJ_RUDP_PORT = 2122
 BUFFER_SIZE = 4096
@@ -28,7 +26,6 @@ def setup_storage():
         os.makedirs(STORAGE_DIR)
         print(f"[*] Created storage root '{STORAGE_DIR}'.")
 
-    # Create the 3 replica buckets
     for bucket in REPLICA_BUCKETS:
         path = os.path.join(STORAGE_DIR, bucket)
         if not os.path.exists(path):
@@ -38,7 +35,6 @@ def setup_storage():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    # Metadata for the logical object
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS metadata (
@@ -50,7 +46,6 @@ def setup_storage():
     """
     )
 
-    # Track physical location (replicas)
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS replicas (
@@ -74,7 +69,6 @@ def handle_tcp_client(client_socket):
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
 
         while True:
@@ -88,13 +82,10 @@ def handle_tcp_client(client_socket):
 
             print(f"[TCP] Received request: {request}")
 
-            # --- System Info ---
             if request == "LIST_BUCKETS":
-                # Show the system buckets
                 resp = "\n".join(REPLICA_BUCKETS)
                 client_socket.send(resp.encode("utf-8"))
 
-            # --- Object Operations ---
             elif request == "LIST":
                 cursor.execute("SELECT key, size FROM metadata")
                 objects = cursor.fetchall()
@@ -106,7 +97,6 @@ def handle_tcp_client(client_socket):
                 client_socket.send(resp.encode("utf-8"))
 
             elif request.startswith("GET ") or request.startswith("RETR "):
-                # GET <key>
                 parts = request.split(" ", 1)
                 if len(parts) < 2:
                     client_socket.send("ERROR Usage: GET <key>".encode("utf-8"))
@@ -114,12 +104,10 @@ def handle_tcp_client(client_socket):
 
                 key = parts[1]
 
-                # Check replicas
                 cursor.execute("SELECT filepath FROM replicas WHERE key=?", (key,))
                 replicas = cursor.fetchall()
 
                 if replicas:
-                    # Load balancing / random choice
                     chosen_path = random.choice(replicas)[0]
                     if os.path.exists(chosen_path):
                         filesize = os.path.getsize(chosen_path)
@@ -144,7 +132,6 @@ def handle_tcp_client(client_socket):
                     client_socket.send("ERROR Object not found".encode("utf-8"))
 
             elif request.startswith("PUT "):
-                # PUT <key> <size>
                 parts = request.split(" ")
                 if len(parts) < 3:
                     client_socket.send("ERROR Usage: PUT <key> <size>".encode("utf-8"))
@@ -155,7 +142,6 @@ def handle_tcp_client(client_socket):
 
                 client_socket.send("READY".encode("utf-8"))
 
-                # Receive to a temp staging area first
                 temp_path = os.path.join(STORAGE_DIR, f"temp_{key}")
                 received = 0
                 try:
@@ -169,14 +155,11 @@ def handle_tcp_client(client_socket):
                             f.write(chunk)
                             received += len(chunk)
 
-                    # Store Metadata
                     cursor.execute(
                         "INSERT OR REPLACE INTO metadata (key, size) VALUES (?, ?)",
                         (key, filesize),
                     )
 
-                    # Replicate to all buckets
-                    # First clear old replicas if overwrite
                     cursor.execute("DELETE FROM replicas WHERE key=?", (key,))
 
                     for bucket in REPLICA_BUCKETS:
@@ -188,7 +171,7 @@ def handle_tcp_client(client_socket):
                         )
 
                     conn.commit()
-                    os.remove(temp_path)  # cleanup temp
+                    os.remove(temp_path)
 
                     print(
                         f"[TCP] Stored object '{key}' and replicated to {REPLICA_BUCKETS}"
@@ -203,7 +186,6 @@ def handle_tcp_client(client_socket):
                     client_socket.send(f"ERROR {str(e)}".encode("utf-8"))
 
             elif request.startswith("DELETE "):
-                # DELETE <key>
                 parts = request.split(" ", 1)
                 if len(parts) < 2:
                     client_socket.send("ERROR Usage: DELETE <key>".encode("utf-8"))
@@ -220,7 +202,6 @@ def handle_tcp_client(client_socket):
                         if os.path.exists(fpath):
                             os.remove(fpath)
 
-                    # Delete metadata (cascades to replicas table due to FK)
                     cursor.execute("DELETE FROM metadata WHERE key=?", (key,))
                     conn.commit()
 
@@ -272,8 +253,7 @@ def start_rudp_server():
 
             if flags & rudp_lib.FLAG_SYN:
                 request = data.decode("utf-8")
-                # GET <key>
-                if request.startswith("GET "):
+                    if request.startswith("GET "):
                     parts = request.split(" ", 1)
                     if len(parts) >= 2:
                         key = parts[1]
@@ -301,16 +281,15 @@ def start_rudp_server():
 
                                 base = 1
                                 next_seq_num = 1
-                                window_size = 2.0  # Use float for congestion control
+                                window_size = 2.0
                                 slow_start_threshold = 16
                                 dup_ack_count = 0
-                                last_ack_recvd = 1  # Must match base so dup ACKs are detected from the start
-                                client_rwnd = 1000  # Initial assumption
+                                last_ack_recvd = 1
+                                client_rwnd = 1000
 
                                 server_socket.settimeout(0.5)
 
                                 while base <= total_packets:
-                                    # Explicit Flow Control using received window size
                                     effective_window = min(
                                         int(window_size), client_rwnd
                                     )
@@ -346,15 +325,12 @@ def start_rudp_server():
 
                                         parsed = rudp_lib.parse_packet(ack_bytes)
 
-                                        # Checksum verification handling
                                         if parsed is None:
                                             print("  [!] Corrupted ACK. Ignoring.")
                                             continue
 
                                         _, ack_num, ack_flags, r_window, _ = parsed
 
-                                        # Update client flow window
-                                        # If window=0, we should treat it carefully (persist timer), but here just min(1, ..)
                                         client_rwnd = max(1, r_window)
 
                                         if ack_flags & rudp_lib.FLAG_ACK:
@@ -363,7 +339,6 @@ def start_rudp_server():
                                                 dup_ack_count = 0
                                                 last_ack_recvd = ack_num
 
-                                                # Congestion Control
                                                 if window_size < slow_start_threshold:
                                                     window_size += 1
                                                 else:
@@ -376,7 +351,6 @@ def start_rudp_server():
                                                     print(
                                                         f"  [!] Fast Retransmit: Resending {base}"
                                                     )
-                                                    # Resend the packet that is missing (base)
                                                     if base <= total_packets:
                                                         chunk_data = chunks[base - 1]
                                                         packet = rudp_lib.create_packet(
@@ -390,12 +364,10 @@ def start_rudp_server():
                                                             packet, client_addr
                                                         )
 
-                                                    # Fast Recovery adjustment
                                                     slow_start_threshold = max(
                                                         int(window_size) // 2, 2
                                                     )
                                                     window_size = slow_start_threshold
-                                                    # Do not reset next_seq_num fully, just retransmit missing
 
                                     except socket.timeout:
                                         print(f"  [!] Timeout! Resending from {base}.")
@@ -415,7 +387,6 @@ def start_rudp_server():
                                 print(f"[-] RUDP: File error on disk.")
                         else:
                             print(f"[-] RUDP: Object '{key}' not found.")
-                            # Send FIN so the client doesn't hang waiting
                             fin_packet = rudp_lib.create_packet(
                                 0, 0, rudp_lib.FLAG_FIN, 0
                             )

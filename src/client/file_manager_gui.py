@@ -5,7 +5,6 @@ import os
 import threading
 import io
 
-# Add common directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
 try:
@@ -17,14 +16,12 @@ except ImportError as e:
     )
     sys.exit(1)
 
-# Import Network Manager
 try:
     from network_manager import NetworkManager
 except ImportError:
     try:
         from src.client.network_manager import NetworkManager
     except ImportError:
-        # Fallback
         from .network_manager import NetworkManager
 
 
@@ -36,19 +33,16 @@ class StorageGUI:
 
         self.client = NetworkManager(self.log_message)
 
-        # --- Modern Clean Theme ---
         style = ttk.Style()
         style.theme_use("clam")
 
-        # Define clean colors
         bg_color = "#f5f5f5"
         fg_color = "#333333"
         panel_bg = "#ffffff"
-        accent_color = "#0078d7"  # Standard Windows Blue
+        accent_color = "#0078d7"
 
         self.root.configure(bg=bg_color)
 
-        # General Styles
         style.configure("TFrame", background=bg_color)
         style.configure(
             "TLabelframe",
@@ -64,7 +58,6 @@ class StorageGUI:
             font=("Segoe UI", 10, "bold"),
         )
 
-        # Button Style
         style.configure(
             "TButton",
             font=("Segoe UI", 10),
@@ -78,12 +71,10 @@ class StorageGUI:
             foreground=[("active", "#000000")],
         )
 
-        # Label Style
         style.configure(
             "TLabel", background=bg_color, foreground=fg_color, font=("Segoe UI", 10)
         )
 
-        # Treeview (File List) Style
         style.configure(
             "Treeview",
             background=panel_bg,
@@ -105,11 +96,9 @@ class StorageGUI:
             foreground=[("selected", "white")],
         )
 
-        # --- Top Bar (Header) ---
         top_frame = ttk.Frame(root, padding=(20, 20, 20, 10))
         top_frame.pack(fill=tk.X)
 
-        # Title
         title_lbl = ttk.Label(
             top_frame,
             text="Object Storage Client",
@@ -118,7 +107,6 @@ class StorageGUI:
         )
         title_lbl.pack(side=tk.TOP, anchor="w", pady=(0, 5))
 
-        # Status & Connect
         status_frame = ttk.Frame(top_frame)
         status_frame.pack(fill=tk.X, pady=5)
 
@@ -130,27 +118,24 @@ class StorageGUI:
         )
         self.lbl_status.pack(side=tk.LEFT, padx=(0, 15))
 
-        # --- Icons ---
         self.icons = {}
 
         def simple_icon(color):
             img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
-            # Draw a document shape: main body
             draw.polygon(
                 [(3, 1), (9, 1), (13, 5), (13, 14), (3, 14)],
                 fill=color,
                 outline="#666666",
             )
-            # Fold corner
             draw.polygon([(9, 1), (9, 5), (13, 5)], fill="#FFFFFF80")
             return ImageTk.PhotoImage(img)
 
-        self.icons["image"] = simple_icon("#9C27B0")  # Purple
-        self.icons["text"] = simple_icon("#2196F3")  # Blue
-        self.icons["code"] = simple_icon("#FF9800")  # Orange
-        self.icons["archive"] = simple_icon("#F44336")  # Red
-        self.icons["default"] = simple_icon("#9E9E9E")  # Gray
+        self.icons["image"] = simple_icon("#9C27B0")
+        self.icons["text"] = simple_icon("#2196F3")
+        self.icons["code"] = simple_icon("#FF9800")
+        self.icons["archive"] = simple_icon("#F44336")
+        self.icons["default"] = simple_icon("#9E9E9E")
 
         self.ext_map = {
             "png": "image",
@@ -179,15 +164,12 @@ class StorageGUI:
             "7z": "archive",
         }
 
-        # --- Middle Area ---
         content_frame = ttk.PanedWindow(root, orient=tk.HORIZONTAL)
         content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 10))
 
-        # Files Area (Left Pane)
         left_pane = ttk.LabelFrame(content_frame, text="Files", padding=10)
         content_frame.add(left_pane, weight=2)
 
-        # Updated columns: Filename is in the tree column (#0) with icon
         columns = ("Size",)
         self.tree_files = ttk.Treeview(
             left_pane, columns=columns, show="tree headings", style="Treeview"
@@ -207,13 +189,11 @@ class StorageGUI:
         self.tree_files.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Refresh Button (files pane)
         btn_refresh = ttk.Button(
             left_pane, text="↻ Refresh List", command=self.refresh_lists
         )
         btn_refresh.pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
 
-        # Preview Area (Right Pane)
         right_pane = ttk.LabelFrame(content_frame, text="Preview", padding=10)
         content_frame.add(right_pane, weight=1)
 
@@ -230,11 +210,9 @@ class StorageGUI:
             self.preview_container, wrap="none", state="disabled", font=("Consolas", 8)
         )
 
-        # --- Actions Bar ---
         action_frame = ttk.Frame(root, padding=(20, 10))
         action_frame.pack(fill=tk.X)
 
-        # Styled Buttons
         ttk.Button(action_frame, text="⬆ Upload", command=self.on_upload).pack(
             side=tk.LEFT, padx=(0, 10)
         )
@@ -252,7 +230,6 @@ class StorageGUI:
             side=tk.RIGHT
         )
 
-        # --- Log Console ---
         log_frame = ttk.Frame(root, padding=(20, 0, 20, 20))
         log_frame.pack(fill=tk.X)
 
@@ -276,12 +253,10 @@ class StorageGUI:
         )
         self.txt_log.pack(fill=tk.X)
 
-        # Add a subtle border to log
         log_border = tk.Frame(log_frame, background="#cccccc")
         self.txt_log.pack(in_=log_border, padx=1, pady=1, fill=tk.X)
         log_border.pack(fill=tk.X)
 
-        # Start connection immediately
         self.root.after(100, self.start_connection)
 
     def log_message(self, msg):
@@ -289,7 +264,7 @@ class StorageGUI:
         self.txt_log.insert(tk.END, msg + "\n")
         self.txt_log.see(tk.END)
         self.txt_log.config(state="disabled")
-        print(msg)  # verify in terminal too
+        print(msg)
 
     def start_connection(self):
         self.lbl_status.config(text="Status: Connecting...", foreground="orange")
@@ -323,14 +298,11 @@ class StorageGUI:
         if not selected:
             return
 
-        # Changed to fetch from 'text' (tree column) due to icon support
         filename = self.tree_files.item(selected[0])["text"]
-        # Clear previous preview
         self.lbl_image_preview.pack_forget()
         self.txt_text_preview.pack_forget()
         self.lbl_preview_info.config(text=f"Loading preview for {filename}...")
 
-        # Debounce/Async load
         threading.Thread(
             target=lambda: self._load_preview(filename), daemon=True
         ).start()
@@ -348,27 +320,22 @@ class StorageGUI:
 
         self.lbl_preview_info.config(text=f"Preview: {filename}")
 
-        # Try as Image (using Pillow for support of JPG, PNG, etc.)
         try:
             image_stream = io.BytesIO(data)
             pil_image = Image.open(image_stream)
 
-            # Resize for preview if needed
             pil_image.thumbnail((300, 300))
 
             img = ImageTk.PhotoImage(pil_image)
             self.lbl_image_preview.config(image=img)
-            self.lbl_image_preview.image = img  # Keep reference
+            self.lbl_image_preview.image = img
             self.lbl_image_preview.pack(fill=tk.BOTH, expand=True)
             return
         except Exception:
-            # Not an image or error loading, try as text
             pass
 
-        # Try as Text
         try:
             text_content = data.decode("utf-8")
-            # Limit text length
             if len(text_content) > 2000:
                 text_content = text_content[:2000] + "\n...[Truncated]"
 
@@ -394,9 +361,7 @@ class StorageGUI:
             self.tree_files.delete(item)
 
         for name, size in files:
-            # Determine icon based on extension
             ext = name.split(".")[-1].lower() if "." in name else ""
-            # Generic mapping logic if needed beyond direct map
             if ext in ["png", "jpg", "jpeg", "gif", "bmp"]:
                 icon_type = "image"
             elif ext in ["txt", "md", "log", "csv"]:
@@ -408,10 +373,8 @@ class StorageGUI:
             else:
                 icon_type = "default"
 
-            # Use pre-generated icons
             icon = self.icons.get(icon_type, self.icons["default"])
 
-            # Insert: text=name goes to tree column (#0), image goes to #0, values go to other columns
             self.tree_files.insert("", tk.END, text=name, image=icon, values=(size,))
 
     def on_upload(self):

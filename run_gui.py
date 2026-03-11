@@ -57,21 +57,17 @@ def kill_existing_servers():
 
 
 def run_process(script_name, new_console=True):
-    # Use 'start' on Windows to open in new console window
     if sys.platform == "win32" and new_console:
         return subprocess.Popen(f"start python {script_name}", shell=True)
     else:
-        # On Linux/e.g. standard execution if not Windows or new_console is False
-        # Note: This might block or mix output if run in same console not recommended for servers
         return subprocess.Popen([sys.executable, script_name])
 
 
 def main():
     print("=== Starting Project with GUI Client ===")
 
-    # Kill old servers before starting to avoid port conflicts
     kill_existing_servers()
-    time.sleep(1)  # Give the OS a moment to release ports
+    time.sleep(1)
 
     install_dependencies()
 
@@ -101,8 +97,6 @@ def main():
         time.sleep(2)
 
         print("\n[*] Starting GUI Client...")
-        # Run GUI client in the current process/window, or spawn it.
-        # Generally GUI applications block, so calling it directly keeps this script running until GUI closes.
         subprocess.call([sys.executable, "src/client/file_manager_gui.py"])
 
     except KeyboardInterrupt:
@@ -111,8 +105,6 @@ def main():
         print(f"[-] Error: {e}")
     finally:
         print("\n[*] Cleaning up...")
-        # Since we used 'start' shell=True on Windows, we can't easily kill the spawned windows from here
-        # without more complex logic, but we can tell the user to close them.
         print(
             "[!] Please manually close the opened server windows (DHCP, DNS, Object Storage)."
         )

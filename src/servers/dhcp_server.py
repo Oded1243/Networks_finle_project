@@ -2,36 +2,29 @@ import binascii
 import socket
 import os
 
-# --- Constants to avoid "magic numbers" (Magic Numbers) ---
-# Ports
 DHCP_SERVER_PORT = int(os.environ.get("DHCP_SERVER_PORT", 67))
 DHCP_CLIENT_PORT = int(os.environ.get("DHCP_CLIENT_PORT", 68))
 
-# Types of operations (OP Codes)
-OP_BOOTREQUEST = 1  # Request from client
-OP_BOOTREPLY = 2  # Response from server
+OP_BOOTREQUEST = 1
+OP_BOOTREPLY = 2
 
-# Hardware types
 HTYPE_ETHERNET = 1
 HLEN_MAC = 6
 
-# DHCP message types (Option 53)
 DHCP_DISCOVER = 1
 DHCP_OFFER = 2
 DHCP_REQUEST = 3
 DHCP_ACK = 5
 
-# Option numbers (DHCP Options)
 OPT_LEASE_TIME = 51
 OPT_MESSAGE_TYPE = 53
 OPT_SERVER_ID = 54
 OPT_END = 255
 
-# Network settings
 SERVER_IP = "192.168.1.100"
 OFFERED_IP = "192.168.1.150"
 BROADCAST_IP = "255.255.255.255"
-LEASE_TIME_SEC = 3600  # One hour
+LEASE_TIME_SEC = 3600
 
 
 def _ip_to_bytes(ip_str):
@@ -69,7 +62,7 @@ def get_dhcp_message_type(options_bytes):
         opt_code = options_bytes[i]
         if opt_code == OPT_END:
             break
-        if opt_code == 0:  # Padding
+        if opt_code == 0:
             i += 1
             continue
 
@@ -89,18 +82,14 @@ def create_dhcp_response(xid, client_mac_bytes, message_type):
     offered_ip_packed = _ip_to_bytes(OFFERED_IP)
     zero_ip_packed = _ip_to_bytes("0.0.0.0")
 
-    # Header: OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, Hops(0)
     header = bytes([OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, 0])
-    xid_secs_flags = (
-        _pack_uint32_be(xid) + _pack_uint16_be(0) + _pack_uint16_be(0x8000)
-    )  # Broadcast flag
+    xid_secs_flags = _pack_uint32_be(xid) + _pack_uint16_be(0) + _pack_uint16_be(0x8000)
 
     ips = zero_ip_packed + offered_ip_packed + server_ip_packed + zero_ip_packed
 
     chaddr = client_mac_bytes + b"\x00" * 10
-    sname_file_cookie = b"\x00" * 192 + _pack_uint32_be(0x63825363)  # Magic Cookie
+    sname_file_cookie = b"\x00" * 192 + _pack_uint32_be(0x63825363)
 
-    # Options
     options = bytes([OPT_MESSAGE_TYPE, 1, message_type])
     options += bytes([OPT_SERVER_ID, 4]) + server_ip_packed
     options += bytes([OPT_LEASE_TIME, 4]) + _pack_uint32_be(LEASE_TIME_SEC)
