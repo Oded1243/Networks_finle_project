@@ -253,7 +253,7 @@ def start_rudp_server():
 
             if flags & rudp_lib.FLAG_SYN:
                 request = data.decode("utf-8")
-                    if request.startswith("GET "):
+                if request.startswith("GET "):
                     parts = request.split(" ", 1)
                     if len(parts) >= 2:
                         key = parts[1]

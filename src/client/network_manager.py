@@ -394,7 +394,7 @@ class NetworkManager:
                                 )
                                 client_socket.sendto(ack_packet, server_addr)
                             else:
-                                                ack_packet = rudp_lib.create_packet(
+                                ack_packet = rudp_lib.create_packet(
                                     0, expected_seq, rudp_lib.FLAG_ACK, 64000
                                 )
                                 client_socket.sendto(ack_packet, server_addr)
