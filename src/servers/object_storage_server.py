@@ -225,6 +225,16 @@ def handle_tcp_client(client_socket):
                     continue
 
                 key = parts[1]
+
+                # Reject keys containing path separators to prevent traversal
+                if not key or os.path.basename(key) != key:
+                    client_socket.send(
+                        "ERROR Invalid key (path separators not allowed)".encode(
+                            "utf-8"
+                        )
+                    )
+                    continue
+
                 filesize = int(parts[2])
 
                 client_socket.send("READY".encode("utf-8"))
@@ -242,10 +252,15 @@ def handle_tcp_client(client_socket):
                             f.write(chunk)
                             received += len(chunk)
 
-                    if received < filesize:
-                        raise Exception(
-                            f"Incomplete upload: received {received}/{filesize} bytes"
+                    if received != filesize:
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                        client_socket.send(
+                            f"ERROR Incomplete upload: received {received}/{filesize} bytes".encode(
+                                "utf-8"
+                            )
                         )
+                        continue
 
                     cursor.execute(
                         "INSERT OR REPLACE INTO metadata (key, size) VALUES (?, ?)",

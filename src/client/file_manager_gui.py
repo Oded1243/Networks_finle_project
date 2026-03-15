@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox, filedialog, scrolledtext
 import sys
 import os
 import threading
+import queue
 import io
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
@@ -257,11 +258,26 @@ class StorageGUI:
         self.txt_log.pack(in_=log_border, padx=1, pady=1, fill=tk.X)
         log_border.pack(fill=tk.X)
 
+        self._gui_queue = queue.Queue()
+        self._poll_gui_queue()
         self.root.after(100, self.start_connection)
+
+    def _poll_gui_queue(self):
+        try:
+            while True:
+                func, args = self._gui_queue.get_nowait()
+                func(*args)
+        except queue.Empty:
+            pass
+        self.root.after(50, self._poll_gui_queue)
+
+    def _schedule(self, func, *args):
+        """Thread-safe: schedule func(*args) on the main thread."""
+        self._gui_queue.put((func, args))
 
     def log_message(self, msg):
         print(msg)
-        self.root.after(0, self._append_log, msg)
+        self._schedule(self._append_log, msg)
 
     def _append_log(self, msg):
         self.txt_log.config(state="normal")
@@ -276,9 +292,9 @@ class StorageGUI:
     def _connect_thread(self):
         success = self.client.connect_sequence()
         if success:
-            self.root.after(0, lambda: self._on_connect_success())
+            self._schedule(self._on_connect_success)
         else:
-            self.root.after(0, lambda: self._on_connect_fail())
+            self._schedule(self._on_connect_fail)
 
     def _on_connect_success(self):
         self.lbl_status.config(
@@ -312,7 +328,7 @@ class StorageGUI:
 
     def _load_preview(self, filename):
         data = self.client.fetch_file_bytes(filename)
-        self.root.after(0, lambda: self._show_preview_data(filename, data))
+        self._schedule(self._show_preview_data, filename, data)
 
     def _show_preview_data(self, filename, data):
         if data is None:
@@ -357,7 +373,7 @@ class StorageGUI:
 
         files = self.client.list_files()
 
-        self.root.after(0, lambda: self._update_lists(files))
+        self._schedule(self._update_lists, files)
 
     def _update_lists(self, files):
         for item in self.tree_files.get_children():
