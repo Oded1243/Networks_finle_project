@@ -1,0 +1,122 @@
+import os
+import sys
+import socket
+import threading
+import time
+import pytest
+
+# Adjust paths to match your project structure
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src/common")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src/servers")))
+
+import rudp_lib
+from object_storage_server import start_tcp_server, setup_storage, OBJ_TCP_PORT
+
+# ==========================================
+# RUDP Library Edge Case Tests
+# ==========================================
+
+class TestRUDPEdgeCases:
+    
+    def test_packet_smaller_than_header(self):
+        """Edge Case: Parsing a packet that is smaller than the 13-byte header."""
+        # rudp_lib returns None if len(packet_bytes) < HEADER_SIZE
+        too_small_packet = b'\x00' * 10
+        assert rudp_lib.parse_packet(too_small_packet) is None
+
+    def test_corrupted_checksum(self):
+        """Edge Case: Data tampered with in transit (checksum mismatch)."""
+        packet = rudp_lib.create_packet(1, 0, rudp_lib.FLAG_DATA, 2048, b"Valid Payload")
+        
+        # Tamper with the payload (change the last byte)
+        corrupted_packet = bytearray(packet)
+        corrupted_packet[-1] = corrupted_packet[-1] ^ 0xFF 
+        
+        # parse_packet should calculate a different checksum and return None
+        assert rudp_lib.parse_packet(bytes(corrupted_packet)) is None
+
+    def test_zero_byte_payload(self):
+        """Edge Case: Sending an RUDP packet with exactly 0 bytes of data (e.g., pure ACK/SYN)."""
+        packet = rudp_lib.create_packet(100, 50, rudp_lib.FLAG_ACK, 2048, b"")
+        parsed = rudp_lib.parse_packet(packet)
+        
+        assert parsed is not None
+        seq, ack, flags, window, data = parsed
+        assert data == b""
+        assert flags == rudp_lib.FLAG_ACK
+        assert seq == 100
+        assert ack == 50
+
+    def test_massive_payload(self):
+        """Edge Case: Maximum possible payload size."""
+        # 60,000 bytes as defined by MAX_PAYLOAD_SIZE in your library
+        large_data = b"A" * rudp_lib.MAX_PAYLOAD_SIZE 
+        packet = rudp_lib.create_packet(1, 0, rudp_lib.FLAG_DATA, 2048, large_data)
+        parsed = rudp_lib.parse_packet(packet)
+        
+        assert parsed is not None
+        assert len(parsed[4]) == rudp_lib.MAX_PAYLOAD_SIZE
+
+
+# ==========================================
+# Object Storage Server TCP Edge Case Tests
+# ==========================================
+
+@pytest.fixture(scope="module", autouse=True)
+def test_server():
+    """Sets up the storage DB and runs the TCP server in a background thread."""
+    setup_storage()
+    server_thread = threading.Thread(target=start_tcp_server, daemon=True)
+    server_thread.start()
+    time.sleep(1) # Give the server a moment to bind to the port
+    yield
+
+def send_tcp_request(request_str):
+    """Helper to send a string to the local TCP server and return the response."""
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.settimeout(2.0)
+    try:
+        client_socket.connect(("127.0.0.1", OBJ_TCP_PORT))
+        client_socket.send(request_str.encode("utf-8"))
+        response = client_socket.recv(4096).decode("utf-8")
+        return response
+    finally:
+        client_socket.close()
+
+class TestServerEdgeCases:
+
+    def test_malformed_get_request(self):
+        """Edge Case: Sending a GET request without specifying a key."""
+        # Server expects len(parts) >= 2
+        response = send_tcp_request("GET ")
+        assert "ERROR Usage: GET <key>" in response
+
+    def test_malformed_put_request(self):
+        """Edge Case: Sending a PUT request without specifying file size."""
+        # Server expects len(parts) >= 3 (PUT <key> <size>)
+        response = send_tcp_request("PUT my_file.txt")
+        assert "ERROR Usage: PUT <key> <size>" in response
+
+    def test_malformed_delete_request(self):
+        """Edge Case: Sending a DELETE request without a key."""
+        # Server expects len(parts) >= 2
+        response = send_tcp_request("DELETE ")
+        assert "ERROR Usage: DELETE <key>" in response
+
+    def test_delete_nonexistent_file(self):
+        """Edge Case: Deleting a file that doesn't exist in the database."""
+        response = send_tcp_request("DELETE definitely_does_not_exist.txt")
+        assert "ERROR Object not found" in response
+
+    def test_get_nonexistent_file(self):
+        """Edge Case: Fetching a file that doesn't exist."""
+        response = send_tcp_request("GET ghost_file.bin")
+        assert "ERROR Object not found" in response
+        
+    def test_put_with_invalid_size(self):
+        """Edge Case: Sending a PUT request where the size is not an integer."""
+        # Server tries to cast int(parts[2]), which will throw a ValueError
+        response = send_tcp_request("PUT file.txt NOT_AN_INT")
+        # In your server code, this gets caught by the top-level except block and connection dies,
+        # or by the inner exception block which sends an error back.
+        assert "ERROR" in response or response == ""
