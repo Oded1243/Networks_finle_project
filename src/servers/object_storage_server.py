@@ -19,6 +19,93 @@ STORAGE_DIR = "object_storage"
 DB_FILE = "storage.db"
 REPLICA_BUCKETS = ["node1", "node2", "node3"]
 
+# ---------------------------------------------------------------------------
+# Server-side fault injection state (controlled via TEST_RUDP commands)
+# ---------------------------------------------------------------------------
+_rudp_test_lock = threading.Lock()
+_rudp_test_config = {
+    "loss_percent": 0,
+    "delay_ms": 0,
+    "drop_seqs": [],
+    "delay_seqs": [],
+    "corrupt_seqs": [],
+}
+
+
+def _rudp_should_drop(seq: int) -> bool:
+    with _rudp_test_lock:
+        if seq in _rudp_test_config["drop_seqs"]:
+            return True
+        lp = _rudp_test_config["loss_percent"]
+    if lp and random.randint(1, 100) <= lp:
+        return True
+    return False
+
+
+def _rudp_delay(seq: int):
+    with _rudp_test_lock:
+        base_ms = _rudp_test_config["delay_ms"]
+        extra = seq in _rudp_test_config["delay_seqs"]
+    delay_sec = base_ms / 1000.0
+    if extra:
+        delay_sec += 0.3  # 300 ms extra for targeted seqs
+    if delay_sec > 0:
+        time.sleep(delay_sec)
+
+
+def _rudp_should_corrupt(seq: int) -> bool:
+    with _rudp_test_lock:
+        return seq in _rudp_test_config["corrupt_seqs"]
+
+
+def _handle_test_rudp(request: str) -> str:
+    """Process TEST_RUDP commands and return a response string."""
+    parts = request.split()
+    if len(parts) < 2:
+        return "ERROR Usage: TEST_RUDP RESET|SHOW|CONFIG ..."
+
+    sub = parts[1].upper()
+
+    if sub == "RESET":
+        with _rudp_test_lock:
+            _rudp_test_config["loss_percent"] = 0
+            _rudp_test_config["delay_ms"] = 0
+            _rudp_test_config["drop_seqs"] = []
+            _rudp_test_config["delay_seqs"] = []
+            _rudp_test_config["corrupt_seqs"] = []
+        return "OK RESET"
+
+    if sub == "SHOW":
+        with _rudp_test_lock:
+            return f"OK {_rudp_test_config}"
+
+    if sub == "CONFIG":
+        with _rudp_test_lock:
+            for token in parts[2:]:
+                if "=" not in token:
+                    continue
+                key, val = token.split("=", 1)
+                key = key.upper()
+                if key == "LOSS_PERCENT":
+                    _rudp_test_config["loss_percent"] = int(val)
+                elif key == "DELAY_MS":
+                    _rudp_test_config["delay_ms"] = int(val)
+                elif key == "DROP_SEQS":
+                    _rudp_test_config["drop_seqs"] = [
+                        int(x) for x in val.split(",") if x
+                    ]
+                elif key == "DELAY_SEQS":
+                    _rudp_test_config["delay_seqs"] = [
+                        int(x) for x in val.split(",") if x
+                    ]
+                elif key == "CORRUPT_SEQS":
+                    _rudp_test_config["corrupt_seqs"] = [
+                        int(x) for x in val.split(",") if x
+                    ]
+        return "OK CONFIG"
+
+    return "ERROR Unknown TEST_RUDP sub-command"
+
 
 def setup_storage():
     """Ensures the object storage directory and database exist. Creates replica buckets."""
@@ -210,6 +297,10 @@ def handle_tcp_client(client_socket):
                 else:
                     client_socket.send("ERROR Object not found".encode("utf-8"))
 
+            elif request.startswith("TEST_RUDP"):
+                resp = _handle_test_rudp(request)
+                client_socket.send(resp.encode("utf-8"))
+
             elif request == "QUIT":
                 break
 
@@ -307,12 +398,28 @@ def start_rudp_server():
                                             chunk_data,
                                         )
 
-                                        if random.randint(1, 100) < 5:
+                                        # ---- fault injection (TEST_RUDP) ----
+                                        if _rudp_should_drop(next_seq_num):
                                             print(
-                                                f"  [X] LOSS: Dropped {next_seq_num}."
+                                                f"  [X] TEST DROP: Dropped {next_seq_num}."
                                             )
+                                        elif _rudp_should_corrupt(next_seq_num):
+                                            ba = bytearray(packet)
+                                            if len(ba) > rudp_lib.HEADER_SIZE + 1:
+                                                ba[rudp_lib.HEADER_SIZE] ^= 0xFF
+                                            server_socket.sendto(bytes(ba), client_addr)
+                                            print(f"  [!] TEST CORRUPT: {next_seq_num}")
                                         else:
-                                            server_socket.sendto(packet, client_addr)
+                                            _rudp_delay(next_seq_num)
+                                            # original random 5% loss kept as fallback
+                                            if random.randint(1, 100) < 5:
+                                                print(
+                                                    f"  [X] LOSS: Dropped {next_seq_num}."
+                                                )
+                                            else:
+                                                server_socket.sendto(
+                                                    packet, client_addr
+                                                )
                                             print(f"  [>] Sent {next_seq_num}")
                                         next_seq_num += 1
 
