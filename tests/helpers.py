@@ -128,16 +128,24 @@ def wait_tcp_ready(timeout: float = 15.0):
 
 def wait_dns_ready(timeout: float = 10.0):
     """Block until the local DNS server responds."""
-    try:
-        from dnslib import DNSRecord
-    except ImportError:
-        return  # Can't check without dnslib
+    import struct
+
+    # Build a minimal A-record query for object.store
+    tx_id = 0x1234
+    flags = 0x0100
+    header = struct.pack("!HHHHHH", tx_id, flags, 1, 0, 0, 0)
+    qname = b"\x06object\x05store\x00"
+    question = qname + struct.pack("!HH", 1, 1)
+    query = header + question
 
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            q = DNSRecord.question("object.store")
-            q.send(LOCAL_HOST, DNS_PORT, tcp=False, timeout=1)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(1)
+            sock.sendto(query, (LOCAL_HOST, DNS_PORT))
+            sock.recvfrom(512)
+            sock.close()
             return True
         except Exception:
             time.sleep(0.3)

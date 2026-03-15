@@ -10,13 +10,6 @@ def install_dependencies():
     needed = []
 
     try:
-        import dnslib
-
-        print("[+] dnslib is installed.")
-    except ImportError:
-        needed.append("dnslib")
-
-    try:
         import PIL
 
         print("[+] Pillow (PIL) is installed.")

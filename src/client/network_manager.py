@@ -1,4 +1,5 @@
 import socket
+import struct
 import time
 import random
 import os
@@ -8,7 +9,6 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
 try:
-    from dnslib import DNSRecord
     import rudp_lib
 except ImportError as e:
     print(f"Warning: Failed to import required modules: {e}")
@@ -165,16 +165,69 @@ class NetworkManager:
             self._perform_dhcp_handshake_single, "DHCP Handshake"
         )
 
+    def _build_dns_query(self, domain):
+        """Build a raw DNS A-record query packet."""
+        tx_id = random.randint(0, 0xFFFF)
+        flags = 0x0100  # standard query, recursion desired
+        header = struct.pack("!HHHHHH", tx_id, flags, 1, 0, 0, 0)
+        qname = b""
+        for part in domain.split("."):
+            qname += bytes([len(part)]) + part.encode("utf-8")
+        qname += b"\x00"
+        question = qname + struct.pack("!HH", 1, 1)  # TYPE_A, CLASS_IN
+        return header + question
+
+    def _parse_dns_response(self, data):
+        """Parse a DNS response and return the first A-record IP or None."""
+        if len(data) < 12:
+            return None
+        header = struct.unpack("!HHHHHH", data[:12])
+        ancount = header[3]
+        if ancount == 0:
+            return None
+        # Skip question section
+        offset = 12
+        while offset < len(data):
+            length = data[offset]
+            if length == 0:
+                offset += 1
+                break
+            offset += 1 + length
+        offset += 4  # QTYPE + QCLASS
+        # Parse answers
+        for _ in range(ancount):
+            if offset + 2 > len(data):
+                break
+            if data[offset] & 0xC0 == 0xC0:
+                offset += 2
+            else:
+                while offset < len(data):
+                    length = data[offset]
+                    if length == 0:
+                        offset += 1
+                        break
+                    offset += 1 + length
+            if offset + 10 > len(data):
+                break
+            rtype, _, _, rdlength = struct.unpack("!HHLH", data[offset : offset + 10])
+            offset += 10
+            if rtype == 1 and rdlength == 4:
+                return socket.inet_ntoa(data[offset : offset + 4])
+            offset += rdlength
+        return None
+
     def _resolve_domain_single(self, domain="object.store"):
         """Single DNS resolution attempt (without retries)"""
         self.log(f"--- Phase 2: DNS Resolution for '{domain}' ---")
-        q = DNSRecord.question(domain)
         try:
-            answer_bytes = q.send(LOCAL_HOST, DNS_PORT, tcp=False, timeout=3)
-            parsed_answer = DNSRecord.parse(answer_bytes)
-
-            if len(parsed_answer.rr) > 0:
-                ip = str(parsed_answer.rr[0].rdata)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(3)
+            query = self._build_dns_query(domain)
+            sock.sendto(query, (LOCAL_HOST, DNS_PORT))
+            data, _ = sock.recvfrom(512)
+            sock.close()
+            ip = self._parse_dns_response(data)
+            if ip:
                 self.log(f"[+] DNS Resolved: {domain} -> {ip}")
                 self.server_ip = ip
                 return ip

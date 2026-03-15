@@ -19,7 +19,7 @@ end
 subgraph NETSVCS["🌐  N E T W O R K · S E R V I C E S"]
   direction LR
   DHCP["📡 <b>DHCP Server</b><br/>Port 67/68 · UDP<br/>DORA handshake<br/>Lease 3600s → 192.168.1.150"]
-  DNS["🔍 <b>Local DNS</b><br/>Port 5053 · UDP<br/>dnslib engine · TTL 60s<br/>Resolves object.store"]
+  DNS["🔍 <b>Local DNS</b><br/>Port 5053 · UDP<br/>TTL 60s<br/>Resolves object.store"]
 end
 
 %% ── TRANSPORT LAYER ──────────────────────────
