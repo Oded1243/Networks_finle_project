@@ -52,7 +52,7 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src", "common"))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src", "client"))
 
-from common import rudp_lib
+import rudp_lib
 from common.fault_injector import FaultConfig, FaultProxy, marker_payload
 from tests.helpers import (
     MARKER_PREFIX,

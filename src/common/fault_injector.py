@@ -19,7 +19,7 @@ import time
 import random
 import copy
 
-from common import rudp_lib
+import rudp_lib
 
 
 # ---------------------------------------------------------------------------

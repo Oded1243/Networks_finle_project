@@ -5,7 +5,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
-from common import rudp_lib
+import rudp_lib
 
 DHCP_SERVER_PORT = int(os.environ.get("DHCP_SERVER_PORT", 67))
 DHCP_CLIENT_PORT = int(os.environ.get("DHCP_CLIENT_PORT", 68))

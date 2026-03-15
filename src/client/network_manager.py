@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../comm
 
 try:
     from dnslib import DNSRecord
-    from common import rudp_lib
+    import rudp_lib
 except ImportError as e:
     print(f"Warning: Failed to import required modules: {e}")
 

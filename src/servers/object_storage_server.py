@@ -9,7 +9,7 @@ import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../common")))
 
-from common import rudp_lib
+import rudp_lib
 
 OBJ_TCP_PORT = 2121
 OBJ_RUDP_PORT = 2122
