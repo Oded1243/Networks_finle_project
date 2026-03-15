@@ -362,17 +362,7 @@ class StorageGUI:
 
         for name, size in files:
             ext = name.split(".")[-1].lower() if "." in name else ""
-            if ext in ["png", "jpg", "jpeg", "gif", "bmp"]:
-                icon_type = "image"
-            elif ext in ["txt", "md", "log", "csv"]:
-                icon_type = "text"
-            elif ext in ["py", "js", "html", "css", "json", "xml", "java", "c", "cpp"]:
-                icon_type = "code"
-            elif ext in ["zip", "tar", "gz", "rar", "7z"]:
-                icon_type = "archive"
-            else:
-                icon_type = "default"
-
+            icon_type = self.ext_map.get(ext, "default")
             icon = self.icons.get(icon_type, self.icons["default"])
 
             self.tree_files.insert("", tk.END, text=name, image=icon, values=(size,))

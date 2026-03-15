@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../comm
 
 try:
     from dnslib import DNSRecord
-    import rudp_lib
+    from common import rudp_lib
 except ImportError as e:
     print(f"Warning: Failed to import required modules: {e}")
 
@@ -40,21 +40,6 @@ def _ip_to_bytes(ip_str):
 def _bytes_to_ip(data):
     """Convert 4 bytes to IP string."""
     return ".".join(str(b) for b in data[:4])
-
-
-def _pack_uint32_be(value):
-    """Pack 32-bit unsigned integer as big-endian bytes."""
-    return value.to_bytes(4, "big")
-
-
-def _pack_uint16_be(value):
-    """Pack 16-bit unsigned integer as big-endian bytes."""
-    return value.to_bytes(2, "big")
-
-
-def _pack_uint8(value):
-    """Pack 8-bit unsigned integer as bytes."""
-    return bytes([value & 0xFF])
 
 
 class NetworkManager:
@@ -108,12 +93,14 @@ class NetworkManager:
     def _create_dhcp_request(self, xid, mac_bytes, message_type):
         header = bytes([OP_BOOTREQUEST, HTYPE_ETHERNET, HLEN_MAC, 0])
         xid_secs_flags = (
-            _pack_uint32_be(xid) + _pack_uint16_be(0) + _pack_uint16_be(0x8000)
+            rudp_lib._pack_uint32_be(xid)
+            + rudp_lib._pack_uint16_be(0)
+            + rudp_lib._pack_uint16_be(0x8000)
         )
         zero_ip = _ip_to_bytes("0.0.0.0")
         ips = zero_ip + zero_ip + zero_ip + zero_ip
         chaddr = mac_bytes + b"\x00" * 10
-        sname_file_cookie = b"\x00" * 192 + _pack_uint32_be(0x63825363)
+        sname_file_cookie = b"\x00" * 192 + rudp_lib._pack_uint32_be(0x63825363)
         options = bytes([OPT_MESSAGE_TYPE, 1, message_type])
         options += bytes([OPT_END])
         return header + xid_secs_flags + ips + chaddr + sname_file_cookie + options
