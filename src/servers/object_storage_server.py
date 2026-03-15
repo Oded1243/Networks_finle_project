@@ -315,6 +315,7 @@ def handle_tcp_client(client_socket):
 def start_tcp_server():
     """Starts the TCP Object Storage server."""
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(("0.0.0.0", OBJ_TCP_PORT))
     server_socket.listen(5)
     print(f"[*] Object Storage TCP Server listening on port {OBJ_TCP_PORT}...")
@@ -327,6 +328,7 @@ def start_tcp_server():
 def start_rudp_server():
     """Starts the RUDP Object Storage server (GET only)."""
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(("0.0.0.0", OBJ_RUDP_PORT))
     print(f"[*] Object Storage RUDP Server listening on port {OBJ_RUDP_PORT}...")
 

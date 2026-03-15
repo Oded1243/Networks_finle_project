@@ -27,9 +27,47 @@ OPT_SERVER_ID = 54
 OPT_END = 255
 
 SERVER_IP = "192.168.1.100"
-OFFERED_IP = "192.168.1.150"
 BROADCAST_IP = "255.255.255.255"
 LEASE_TIME_SEC = 3600
+
+# IP pool range
+POOL_START = "192.168.1.150"
+POOL_END = "192.168.1.200"
+
+# {mac_str: ip_str} – active leases
+_leases = {}
+# {ip_str: mac_str} – reverse lookup
+_ip_to_mac = {}
+
+
+def _next_available_ip():
+    """Return the first unleased IP in the pool, or None if exhausted."""
+    start = list(map(int, POOL_START.split(".")))
+    end = list(map(int, POOL_END.split(".")))
+    current = start[:]
+    while current <= end:
+        ip_str = ".".join(str(o) for o in current)
+        if ip_str not in _ip_to_mac:
+            return ip_str
+        current[3] += 1
+        for i in (3, 2, 1):
+            if current[i] > 255:
+                current[i] = 0
+                current[i - 1] += 1
+    return None
+
+
+def _allocate_ip(mac_str):
+    """Return an IP for *mac_str*, reusing an existing lease or picking a new one."""
+    if mac_str in _leases:
+        return _leases[mac_str]
+    ip = _next_available_ip()
+    if ip is None:
+        print("[!] IP pool exhausted!")
+        return None
+    _leases[mac_str] = ip
+    _ip_to_mac[ip] = mac_str
+    return ip
 
 
 def _ip_to_bytes(ip_str):
@@ -59,12 +97,12 @@ def get_dhcp_message_type(options_bytes):
     return None
 
 
-def create_dhcp_response(xid, client_mac_bytes, message_type):
+def create_dhcp_response(xid, client_mac_bytes, message_type, offered_ip):
     """
     Builds a response packet (Offer or ACK).
     """
     server_ip_packed = _ip_to_bytes(SERVER_IP)
-    offered_ip_packed = _ip_to_bytes(OFFERED_IP)
+    offered_ip_packed = _ip_to_bytes(offered_ip)
     zero_ip_packed = _ip_to_bytes("0.0.0.0")
 
     header = bytes([OP_BOOTREPLY, HTYPE_ETHERNET, HLEN_MAC, 0])
@@ -111,15 +149,29 @@ def start_dhcp_server():
                 msg_type = get_dhcp_message_type(options_bytes)
 
                 if msg_type == DHCP_DISCOVER:
+                    offered_ip = _allocate_ip(mac_str)
+                    if offered_ip is None:
+                        print(f"\n[!] No IPs available for {mac_str}")
+                        continue
                     print(f"\n[+] Received DISCOVER from {mac_str}")
-                    print(f"[*] Sending OFFER ({OFFERED_IP})...")
-                    response = create_dhcp_response(xid, client_mac_bytes, DHCP_OFFER)
+                    print(f"[*] Sending OFFER ({offered_ip})...")
+                    response = create_dhcp_response(
+                        xid, client_mac_bytes, DHCP_OFFER, offered_ip
+                    )
                     server_socket.sendto(response, (BROADCAST_IP, DHCP_CLIENT_PORT))
 
                 elif msg_type == DHCP_REQUEST:
-                    print(f"\n[+] Received REQUEST from {mac_str} for IP {OFFERED_IP}")
+                    offered_ip = _leases.get(mac_str)
+                    if offered_ip is None:
+                        offered_ip = _allocate_ip(mac_str)
+                    if offered_ip is None:
+                        print(f"\n[!] No IPs available for {mac_str}")
+                        continue
+                    print(f"\n[+] Received REQUEST from {mac_str} for IP {offered_ip}")
                     print("[*] Sending ACK...")
-                    response = create_dhcp_response(xid, client_mac_bytes, DHCP_ACK)
+                    response = create_dhcp_response(
+                        xid, client_mac_bytes, DHCP_ACK, offered_ip
+                    )
                     server_socket.sendto(response, (BROADCAST_IP, DHCP_CLIENT_PORT))
                     print("[V] IP Assigned successfully!")
 
