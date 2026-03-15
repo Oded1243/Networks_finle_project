@@ -67,6 +67,7 @@ def build_dns_response(transaction_id, original_question_bytes, ip_address):
 
 def start_udp_dns_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((DNS_HOST, DNS_PORT))
     print(f"[*] Starting UDP DNS server on {DNS_HOST}:{DNS_PORT}...")
 
@@ -134,6 +135,7 @@ class DoHHandler(http.server.BaseHTTPRequestHandler):
 
 def start_doh_server():
     Handler = DoHHandler
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer((DNS_HOST, DOH_PORT), Handler) as httpd:
         print(f"[*] Starting DoH server on http://{DNS_HOST}:{DOH_PORT}/dns-query ...")
         httpd.serve_forever()

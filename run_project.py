@@ -32,8 +32,10 @@ def kill_existing_servers():
 
     if sys.platform == "win32":
         for target in targets:
-            # PowerShell command to find processes with the target script in command line and kill them
-            ps_cmd = f"Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like '*{target}*' }} | Stop-Process -Force -ErrorAction SilentlyContinue"
+            ps_cmd = (
+                f"Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like '*{target}*' }}"
+                f" | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
+            )
             subprocess.run(
                 ["powershell", "-Command", ps_cmd],
                 stdout=subprocess.DEVNULL,
@@ -51,7 +53,8 @@ def kill_existing_servers():
 
 def run_process(script_name, new_console=True):
     if sys.platform == "win32" and new_console:
-        return subprocess.Popen(f"start python {script_name}", shell=True)
+        cmd = f'start "Server" cmd /k "{sys.executable} {script_name}"'
+        return subprocess.Popen(cmd, shell=True)
     else:
         return subprocess.Popen([sys.executable, script_name])
 
