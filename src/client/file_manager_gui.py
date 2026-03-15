@@ -260,11 +260,14 @@ class StorageGUI:
         self.root.after(100, self.start_connection)
 
     def log_message(self, msg):
+        print(msg)
+        self.root.after(0, self._append_log, msg)
+
+    def _append_log(self, msg):
         self.txt_log.config(state="normal")
         self.txt_log.insert(tk.END, msg + "\n")
         self.txt_log.see(tk.END)
         self.txt_log.config(state="disabled")
-        print(msg)
 
     def start_connection(self):
         self.lbl_status.config(text="Status: Connecting...", foreground="orange")

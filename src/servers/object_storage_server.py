@@ -242,6 +242,11 @@ def handle_tcp_client(client_socket):
                             f.write(chunk)
                             received += len(chunk)
 
+                    if received < filesize:
+                        raise Exception(
+                            f"Incomplete upload: received {received}/{filesize} bytes"
+                        )
+
                     cursor.execute(
                         "INSERT OR REPLACE INTO metadata (key, size) VALUES (?, ?)",
                         (key, filesize),

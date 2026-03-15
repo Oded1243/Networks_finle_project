@@ -373,9 +373,16 @@ class NetworkManager:
                         f.write(chunk)
                         received += len(chunk)
 
+                s.close()
+
+                if received < size:
+                    self.log(
+                        f"[-] Download incomplete: received {received}/{size} bytes"
+                    )
+                    return None
+
                 elapsed = time.time() - start_time
                 self.log(f"[+] Download complete: {save_path} ({elapsed:.2f}s)")
-                s.close()
                 return True
             else:
                 self.log(f"[-] Server Error: {response}")
